@@ -4,7 +4,7 @@ import { MobileNav } from '../components/MobileNav';
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { User } from 'lucide-react';
 
-export const Red = () => {
+export const NivelAlcanzadoComponet = () => {
   const [username, setUsername] = useState('');
   const [nivelUsuario, setNivelUsuario] = useState(0);
   const [nivelesCompletados, setNivelesCompletados] = useState(0);
@@ -119,36 +119,15 @@ export const Red = () => {
   );
 
   return (
-    <div className="min-h-screen flex flex-col text-white">
-      <Background />
-      {loading ? ( // Mostrar el preloader mientras se carga
-        <Preloader />
-      ) : (
-        <div className="max-w-7xl px-4 py-16 flex-grow bg-opacity-65 bg-gray-800 rounded-2xl shadow-lg">
-          <h1 className="text-4xl font-bold mb-4">Red de Usuarios</h1>
-          <hr />
-          <div className="mt-6 bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center">           
+    <div >
+        
+          <div className="mt-6 bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center">
+            <User className="text-3xl mr-4" />           
             <div>
               <h2 className="text-xl font-semibold">Nivel alcanzado</h2>
               <p className="text-gray-400">{nivelesCompletados}</p>
             </div>
           </div>
-          <div className="mt-4 bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center">           
-            <div>
-              <h2 className="text-xl font-semibold">Nivel Máximo</h2>
-              <p className="text-gray-400">12</p>
-            </div>
-            <br />
-          </div>
-          <div className="mt-4 bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md">
-            <h2 className="text-2xl font-semibold mb-4">Red de Usuarios</h2>
-            
-            {/* Renderizar todos los niveles */}
-            {renderTodosLosNiveles(piramideData)}
-          </div>
-        </div>
-      )}
-      <MobileNav />
     </div>
   );
 };

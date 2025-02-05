@@ -26,7 +26,7 @@ export const Register = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/auth/registrar`, {
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -39,7 +39,8 @@ export const Register = () => {
           navigate('/login'); // Redirigir al login
         }, 3000); // Duración del mensaje
       } else {
-        setMessage({ text: 'Error en el registro', type: 'error' });
+        const errorData = await response.json();
+        setMessage({ text: errorData.message || 'Error en el registro', type: 'error' });
       }
     } catch (error) {
       console.error('Error:', error);
@@ -67,10 +68,9 @@ export const Register = () => {
           )}
           
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Campos del formulario */}
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Nombre Completo
-              </label>
+              <label className="block text-sm font-medium text-gray-400 mb-2">Nombre Completo</label>
               <input
                 type="text"
                 required
@@ -81,12 +81,9 @@ export const Register = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                DNI
-              </label>
+              <label className="block text-sm font-medium text-gray-400 mb-2">CC</label>
               <input
                 type="text"
-                required
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.dni}
                 onChange={(e) => setFormData({ ...formData, dni: e.target.value })}
@@ -94,9 +91,7 @@ export const Register = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Línea de Llamadas
-              </label>
+              <label className="block text-sm font-medium text-gray-400 mb-2">Línea de Llamadas</label>
               <input
                 type="text"
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -106,9 +101,7 @@ export const Register = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                WhatsApp
-              </label>
+              <label className="block text-sm font-medium text-gray-400 mb-2">WhatsApp</label>
               <input
                 type="text"
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -118,9 +111,7 @@ export const Register = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Número de Cuenta
-              </label>
+              <label className="block text-sm font-medium text-gray-400 mb-2">Número de Cuenta</label>
               <input
                 type="text"
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -130,9 +121,7 @@ export const Register = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Banco
-              </label>
+              <label className="block text-sm font-medium text-gray-400 mb-2">Banco</label>
               <input
                 type="text"
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -142,9 +131,7 @@ export const Register = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Titular de la Cuenta
-              </label>
+              <label className="block text-sm font-medium text-gray-400 mb-2">Titular de la Cuenta</label>
               <input
                 type="text"
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -154,9 +141,7 @@ export const Register = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Correo Electrónico
-              </label>
+              <label className="block text-sm font-medium text-gray-400 mb-2">Correo Electrónico</label>
               <input
                 type="email"
                 required
@@ -167,9 +152,7 @@ export const Register = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Nombre de Usuario
-              </label>
+              <label className="block text-sm font-medium text-gray-400 mb-2">Nombre de Usuario</label>
               <input
                 type="text"
                 required
@@ -180,9 +163,7 @@ export const Register = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Contraseña
-              </label>
+              <label className="block text-sm font-medium text-gray-400 mb-2">Contraseña</label>
               <input
                 type="password"
                 required
@@ -193,9 +174,7 @@ export const Register = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Código de Referido
-              </label>
+              <label className="block text-sm font-medium text-gray-400 mb-2">Código de Referido</label>
               <input
                 type="text"
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"

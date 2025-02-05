@@ -67,7 +67,9 @@ export const Home = () => {
             </div>
             <div>
               <h3 className="font-semibold mb-4">Legal</h3>
-              <p className="text-sm">Términos y Condiciones</p>
+              <a href="/terminos-y-condiciones" className="text-sm text-gray-400 hover:underline">
+              Términos y Condiciones
+              </a>
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-400">
