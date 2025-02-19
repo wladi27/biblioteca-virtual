@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Background } from '../components/Background';
-import { FaHistory, FaUsers, FaDollarSign, FaCode, FaClipboard } from 'react-icons/fa';
+import { FaHistory, FaUsers, FaCode, FaClipboard } from 'react-icons/fa';
 import { AdminNav } from '../components/AdminNav';
 import { Link } from 'react-router-dom';
 
@@ -31,37 +31,25 @@ export const Admin = () => {
           fetch(`${import.meta.env.VITE_URL_LOCAL}/api/aportes`)
         ]);
 
-        if (usuariosResponse.ok) {
-          const usuariosData = await usuariosResponse.json();
-          setTotalUsuarios(usuariosData.length);
-          setTodosLosUsuarios(usuariosData);
-        } else {
-          throw new Error('Error al cargar usuarios');
-        }
+        if (!usuariosResponse.ok) throw new Error('Error al cargar usuarios');
+        const usuariosData = await usuariosResponse.json();
+        setTotalUsuarios(usuariosData.length);
+        setTodosLosUsuarios(usuariosData);
 
-        if (codigosResponse.ok) {
-          const codigosData = await codigosResponse.json();
-          setTotalCodigosCreados(codigosData.length);
-        } else {
-          throw new Error('Error al cargar códigos');
-        }
+        if (!codigosResponse.ok) throw new Error('Error al cargar códigos');
+        const codigosData = await codigosResponse.json();
+        setTotalCodigosCreados(codigosData.length);
 
-        if (retirosResponse.ok) {
-          const retirosData = await retirosResponse.json();
-          setTotalRetiros(retirosData.length);
-          setListaRetiros(retirosData);
-        } else {
-          throw new Error('Error al cargar retiros');
-        }
+        if (!retirosResponse.ok) throw new Error('Error al cargar retiros');
+        const retirosData = await retirosResponse.json();
+        setTotalRetiros(retirosData.length);
+        setListaRetiros(retirosData);
 
-        if (aportesResponse.ok) {
-          const aportesData = await aportesResponse.json();
-          setAportes(aportesData); // Guardamos los aportes
-          const aportesValidados = aportesData.filter(aporte => aporte.aporte === true);
-          setTotalAportesValidados(aportesValidados.length);
-        } else {
-          throw new Error('Error al cargar aportes');
-        }
+        if (!aportesResponse.ok) throw new Error('Error al cargar aportes');
+        const aportesData = await aportesResponse.json();
+        setAportes(aportesData);
+        const aportesValidados = aportesData.filter(aporte => aporte.aporte);
+        setTotalAportesValidados(aportesValidados.length);
       } catch (error) {
         setError(error.message);
       } finally {
@@ -75,43 +63,42 @@ export const Admin = () => {
   const obtenerDatosUsuario = useCallback(async (usuarioId, retiroId) => {
     try {
       const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${usuarioId}`);
-      if (response.ok) {
-        const usuarioData = await response.json();
-        setUsuarioSeleccionado(usuarioData);
-        setRetiroSeleccionado(retiroId);
-        await obtenerReferidos(usuarioId);
-        setModalVisible(true);
-      } else {
-        setError('Error al obtener los datos del usuario');
-      }
+      if (!response.ok) throw new Error('Error al obtener los datos del usuario');
+      const usuarioData = await response.json();
+      setUsuarioSeleccionado(usuarioData);
+      setRetiroSeleccionado(retiroId);
+      // Llamar a obtenerReferidos después de obtener el usuario
+      await obtenerReferidos(usuarioId);
+      setModalVisible(true);
     } catch (error) {
       setError(error.message);
     }
-  }, []);
+  }, [todosLosUsuarios, aportes]); // Asegurarse de que estos datos estén disponibles
 
   const obtenerReferidos = async (usuarioId) => {
     try {
       const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/referralCodes/user/${usuarioId}`);
-      if (response.ok) {
-        const codigosData = await response.json();
-        const codigosReferidos = codigosData.map(codigo => codigo.code);
+      if (!response.ok) throw new Error('Error al obtener los códigos de referido');
+      const codigosData = await response.json();
+      const codigosReferidos = codigosData.map(codigo => codigo.code);
+
+      if (todosLosUsuarios.length > 0) {
         const usuariosReferidosFiltrados = todosLosUsuarios.filter(usuario =>
           codigosReferidos.includes(usuario.codigo_referido)
         );
 
-        // Aquí verificamos los aportes para cada usuario referido
         const usuariosReferidosConNombres = usuariosReferidosFiltrados.map(usuario => {
           const aporte = aportes.find(aporte => aporte.usuarioId === usuario._id);
           return {
             id: usuario._id,
-            nombre: usuario.nombre_usuario, // Asegúrate de que 'nombre_usuario' sea el campo correcto
-            validado: aporte ? aporte.aporte : false // Verificamos si está validado
+            nombre: usuario.nombre_usuario,
+            validado: aporte ? aporte.aporte : false
           };
         });
 
         setUsuariosReferidos(usuariosReferidosConNombres);
       } else {
-        setError('Error al obtener los códigos de referido');
+        setUsuariosReferidos([]);
       }
     } catch (error) {
       setError('Error al obtener los referidos');
@@ -149,9 +136,7 @@ export const Admin = () => {
         body: JSON.stringify({ status: nuevoEstado })
       });
 
-      if (!response.ok) {
-        throw new Error('Error al cambiar el estado del retiro');
-      }
+      if (!response.ok) throw new Error('Error al cambiar el estado del retiro');
 
       const retirosResponse = await fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals`);
       const retirosData = await retirosResponse.json();
@@ -170,9 +155,7 @@ export const Admin = () => {
         method: 'DELETE'
       });
 
-      if (!response.ok) {
-        throw new Error('Error al eliminar el retiro');
-      }
+      if (!response.ok) throw new Error('Error al eliminar el retiro');
 
       const retirosResponse = await fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals`);
       const retirosData = await retirosResponse.json();
@@ -257,62 +240,15 @@ export const Admin = () => {
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 overflow-y-auto">
           <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">Detalles del Usuario</h2>
-            <div className="mb-2 flex justify-between items-center">
-              <span><strong>Nombre Completo:</strong> {usuarioSeleccionado.nombre_completo}</span>
-              <FaClipboard 
-                className="cursor-pointer text-green-500"
-                onClick={() => copiarAlPortapapeles(usuarioSeleccionado.nombre_completo)}
-              />
-            </div>
-            <div className="mb-2 flex justify-between items-center">
-              <span><strong>CC:</strong> {usuarioSeleccionado.dni}</span>
-              <FaClipboard 
-                className="cursor-pointer text-green-500"
-                onClick={() => copiarAlPortapapeles(usuarioSeleccionado.dni)}
-              />
-            </div>
-            <div className="mb-2 flex justify-between items-center">
-              <span><strong>Teléfono:</strong> {usuarioSeleccionado.linea_llamadas}</span>
-              <FaClipboard 
-                className="cursor-pointer text-green-500"
-                onClick={() => copiarAlPortapapeles(usuarioSeleccionado.linea_llamadas)}
-              />
-            </div>
-            <div className="mb-2 flex justify-between items-center">
-              <span><strong>WhatsApp:</strong> {usuarioSeleccionado.linea_whatsapp}</span>
-              <FaClipboard 
-                className="cursor-pointer text-green-500"
-                onClick={() => copiarAlPortapapeles(usuarioSeleccionado.linea_whatsapp)}
-              />
-            </div>
-            <div className="mb-2 flex justify-between items-center">
-              <span><strong>Banco:</strong> {usuarioSeleccionado.banco}</span>
-              <FaClipboard 
-                className="cursor-pointer text-green-500"
-                onClick={() => copiarAlPortapapeles(usuarioSeleccionado.banco)}
-              />
-            </div>
-            <div className="mb-2 flex justify-between items-center">
-              <span><strong>Número de Cuenta:</strong> {usuarioSeleccionado.cuenta_numero}</span>
-              <FaClipboard 
-                className="cursor-pointer text-green-500"
-                onClick={() => copiarAlPortapapeles(usuarioSeleccionado.cuenta_numero)}
-              />
-            </div>
-            <div className="mb-2 flex justify-between items-center">
-              <span><strong>Titular de la Cuenta:</strong> {usuarioSeleccionado.titular_cuenta}</span>
-              <FaClipboard 
-                className="cursor-pointer text-green-500"
-                onClick={() => copiarAlPortapapeles(usuarioSeleccionado.titular_cuenta)}
-              />
-            </div>
-            <div className="mb-2 flex justify-between items-center">
-              <span><strong>Correo Electrónico:</strong> {usuarioSeleccionado.correo_electronico}</span>
-              <FaClipboard 
-                className="cursor-pointer text-green-500"
-                onClick={() => copiarAlPortapapeles(usuarioSeleccionado.correo_electronico)}
-              />
-            </div>
+            {['nombre_completo', 'dni', 'linea_llamadas', 'linea_whatsapp', 'banco', 'cuenta_numero', 'titular_cuenta', 'correo_electronico'].map((field, index) => (
+              <div key={index} className="mb-2 flex justify-between items-center">
+                <span><strong>{field.replace('_', ' ').toUpperCase()}:</strong> {usuarioSeleccionado[field]}</span>
+                <FaClipboard 
+                  className="cursor-pointer text-green-500"
+                  onClick={() => copiarAlPortapapeles(usuarioSeleccionado[field])}
+                />
+              </div>
+            ))}
             <hr />
             <h3 className="text-xl font-semibold mt-4">Usuarios Referidos</h3>
             {usuariosReferidos.length > 0 ? (
@@ -358,6 +294,7 @@ export const Admin = () => {
             >
               Cerrar
             </button>
+            <br /><br />
           </div>
         </div>
       )}
