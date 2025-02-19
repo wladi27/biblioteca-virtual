@@ -88,7 +88,7 @@ export const Red = () => {
             {data.map((usuario) => (
               <li key={usuario._id} className="mb-2 flex items-center transition-colors hover:bg-gray-700 p-2 rounded-md">
                 <User className="mr-2" />
-                {usuario._id} | {usuario.nombre_completo}
+                 {usuario.nombre_completo}
               </li>
             ))}
           </ul>
