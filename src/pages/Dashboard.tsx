@@ -99,7 +99,8 @@ export const Dashboard = () => {
           localStorage.setItem('aporteDado', 'true'); // Guardar estado en localStorage
 
           // Enviar mensaje a WhatsApp después de dar aporte
-          const mensaje = `Hola, deseo dar mi aporte de la plataforma *Biblioteca Virtual*. Podría suministrarme los datos de la cuenta a consignar.`;
+          const mensaje = `Hola!
+Me gustaría hacer una contribución a la biblioteca virtual. ¿Podrías proporcionarme la cuenta para realizar el aporte?`;
           const telefono = "+573137862938"; // Reemplaza con el número de WhatsApp deseado
           const urlWhatsApp = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
           window.open(urlWhatsApp, '_blank');
