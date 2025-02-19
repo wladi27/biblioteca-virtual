@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Background } from '../components/Background';
 import { FaHistory, FaUsers, FaDollarSign, FaCode, FaClipboard } from 'react-icons/fa';
 import { AdminNav } from '../components/AdminNav';
@@ -14,11 +14,16 @@ export const Admin = () => {
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [retiroSeleccionado, setRetiroSeleccionado] = useState(null);
-  const [aportesHijos, setAportesHijos] = useState([]);
+  const [usuariosReferidos, setUsuariosReferidos] = useState([]);
+  const [todosLosUsuarios, setTodosLosUsuarios] = useState([]);
+  const [aportes, setAportes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setLoading(true);
         const [usuariosResponse, codigosResponse, retirosResponse, aportesResponse] = await Promise.all([
           fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios`),
           fetch(`${import.meta.env.VITE_URL_LOCAL}/api/referralCodes`),
@@ -29,80 +34,94 @@ export const Admin = () => {
         if (usuariosResponse.ok) {
           const usuariosData = await usuariosResponse.json();
           setTotalUsuarios(usuariosData.length);
+          setTodosLosUsuarios(usuariosData);
+        } else {
+          throw new Error('Error al cargar usuarios');
         }
 
         if (codigosResponse.ok) {
           const codigosData = await codigosResponse.json();
           setTotalCodigosCreados(codigosData.length);
+        } else {
+          throw new Error('Error al cargar códigos');
         }
 
         if (retirosResponse.ok) {
           const retirosData = await retirosResponse.json();
           setTotalRetiros(retirosData.length);
           setListaRetiros(retirosData);
+        } else {
+          throw new Error('Error al cargar retiros');
         }
 
         if (aportesResponse.ok) {
           const aportesData = await aportesResponse.json();
+          setAportes(aportesData); // Guardamos los aportes
           const aportesValidados = aportesData.filter(aporte => aporte.aporte === true);
           setTotalAportesValidados(aportesValidados.length);
+        } else {
+          throw new Error('Error al cargar aportes');
         }
       } catch (error) {
-        console.error('Error:', error);
+        setError(error.message);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchData();
   }, []);
 
-  const obtenerDatosUsuario = async (usuarioId, retiroId) => {
+  const obtenerDatosUsuario = useCallback(async (usuarioId, retiroId) => {
     try {
       const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${usuarioId}`);
       if (response.ok) {
         const usuarioData = await response.json();
         setUsuarioSeleccionado(usuarioData);
         setRetiroSeleccionado(retiroId);
-        await obtenerAportes(usuarioData); // Obtener aportes de usuario y sus hijos
+        await obtenerReferidos(usuarioId);
         setModalVisible(true);
       } else {
-        console.error('Error al obtener los datos del usuario:', response.statusText);
+        setError('Error al obtener los datos del usuario');
       }
     } catch (error) {
-      console.error('Error:', error);
+      setError(error.message);
     }
-  };
+  }, []);
 
-  const obtenerAportes = async (usuario) => {
+  const obtenerReferidos = async (usuarioId) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/aportes`);
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/referralCodes/user/${usuarioId}`);
       if (response.ok) {
-        const aportesData = await response.json();
+        const codigosData = await response.json();
+        const codigosReferidos = codigosData.map(codigo => codigo.code);
+        const usuariosReferidosFiltrados = todosLosUsuarios.filter(usuario =>
+          codigosReferidos.includes(usuario.codigo_referido)
+        );
 
-        // Filtrar los IDs de los hijos
-        const hijosIds = [usuario.hijo1_id, usuario.hijo2_id, usuario.hijo3_id].filter(id => id);
-
-        // Crear un objeto para almacenar los aportes de los hijos
-        const aportesHijosData = hijosIds.map(id => {
-          const aporte = aportesData.find(aporte => aporte.usuarioId === id);
+        // Aquí verificamos los aportes para cada usuario referido
+        const usuariosReferidosConNombres = usuariosReferidosFiltrados.map(usuario => {
+          const aporte = aportes.find(aporte => aporte.usuarioId === usuario._id);
           return {
-            hijoId: id,
-            aporte: aporte ? aporte.aporte : false // Si no hay aporte, se considera como false
+            id: usuario._id,
+            nombre: usuario.nombre_usuario, // Asegúrate de que 'nombre_usuario' sea el campo correcto
+            validado: aporte ? aporte.aporte : false // Verificamos si está validado
           };
         });
 
-        // Guardar los datos de los aportes de los hijos en el estado
-        setAportesHijos(aportesHijosData);
+        setUsuariosReferidos(usuariosReferidosConNombres);
+      } else {
+        setError('Error al obtener los códigos de referido');
       }
     } catch (error) {
-      console.error('Error al obtener los aportes:', error);
+      setError('Error al obtener los referidos');
     }
   };
 
   const filtrarRetiros = () => {
     if (!busqueda) return listaRetiros;
-
     return listaRetiros.filter(retiro => 
-      retiro.usuarioId._id.includes(busqueda) || 
+      retiro.usuarioId._id.toLowerCase().includes(busqueda.toLowerCase()) || 
       retiro.usuarioId.nombre_completo.toLowerCase().includes(busqueda.toLowerCase())
     );
   };
@@ -111,7 +130,7 @@ export const Admin = () => {
     setModalVisible(false);
     setUsuarioSeleccionado(null);
     setRetiroSeleccionado(null);
-    setAportesHijos([]); // Limpiar aportes al cerrar el modal
+    setUsuariosReferidos([]);
   };
 
   const copiarAlPortapapeles = (texto) => {
@@ -126,9 +145,7 @@ export const Admin = () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals/${retiroSeleccionado}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nuevoEstado })
       });
 
@@ -141,7 +158,7 @@ export const Admin = () => {
       setListaRetiros(retirosData);
       cerrarModal();
     } catch (error) {
-      console.error('Error al cambiar el estado del retiro:', error);
+      setError(error.message);
     }
   };
 
@@ -162,7 +179,7 @@ export const Admin = () => {
       setListaRetiros(retirosData);
       cerrarModal();
     } catch (error) {
-      console.error('Error al eliminar el retiro:', error);
+      setError(error.message);
     }
   };
 
@@ -173,6 +190,9 @@ export const Admin = () => {
       <div className="max-w-7xl px-4 py-16 flex-grow bg-opacity-65 bg-gray-800 rounded-2xl shadow-lg">
         <h1 className="text-4xl font-bold mb-4">Administración</h1>
         <hr />
+
+        {loading && <p>Cargando datos...</p>}
+        {error && <p className="text-red-500">{error}</p>}
 
         <div className="pt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
           <Link to="/BV/usuarios" className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center">
@@ -191,14 +211,6 @@ export const Admin = () => {
             </div>
           </Link>
 
-          {/* <Link to="/BV/retiros" className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center">
-            <FaDollarSign className="text-3xl mr-4" />
-            <div>
-              <h2 className="text-xl font-semibold">Total de Retiros</h2>
-              <p className="text-gray-400">{totalRetiros}</p>
-            </div>
-          </Link>
- */}
           <Link to="/BV/aportes" className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center">
             <FaClipboard className="text-3xl mr-4" />
             <div>
@@ -220,7 +232,7 @@ export const Admin = () => {
             className="mb-4 p-2 rounded bg-gray-600 text-white w-full"
           />
           <ul className="space-y-4">
-            {filtrarRetiros().map((retiro) => ( // Mostrar todos los retiros
+            {filtrarRetiros().map((retiro) => (
               <li key={retiro._id} className="bg-gray-600 p-4 rounded-lg flex justify-between items-center">
                 <div className="flex-grow">
                   <p className="font-semibold">ID Usuario: {retiro.usuarioId._id}</p>
@@ -242,8 +254,8 @@ export const Admin = () => {
       </div>
 
       {modalVisible && usuarioSeleccionado && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75">
-          <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-lg w-full">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 overflow-y-auto">
+          <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">Detalles del Usuario</h2>
             <div className="mb-2 flex justify-between items-center">
               <span><strong>Nombre Completo:</strong> {usuarioSeleccionado.nombre_completo}</span>
@@ -252,7 +264,6 @@ export const Admin = () => {
                 onClick={() => copiarAlPortapapeles(usuarioSeleccionado.nombre_completo)}
               />
             </div>
-            
             <div className="mb-2 flex justify-between items-center">
               <span><strong>CC:</strong> {usuarioSeleccionado.dni}</span>
               <FaClipboard 
@@ -303,16 +314,22 @@ export const Admin = () => {
               />
             </div>
             <hr />
-            {/* Mostrar aportes de los hijos */}
-            <h3 className="text-xl font-semibold mt-4">Aportes de los Hijos</h3>
-            {aportesHijos.map((aporte, index) => (
-              <div key={index} className="mb-2 flex justify-between items-center">
-                <span><strong>Hijo ID:</strong> {aporte.hijoId}</span>
-                <span className={aporte.aporte ? 'text-green-500' : 'text-red-500'}>
-                  {aporte.aporte ? 'Validado' : 'No Validado'}
-                </span>
+            <h3 className="text-xl font-semibold mt-4">Usuarios Referidos</h3>
+            {usuariosReferidos.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4 mt-2">
+                {usuariosReferidos.map(({ id, nombre, validado }, index) => (
+                  <div key={index} className="p-4 rounded-lg bg-gray-700">
+                    <p className="font-semibold">ID Usuario: {id}</p>
+                    <p className="font-semibold">Nombre: {nombre}</p>
+                    <p className={`font-semibold ${validado ? 'text-green-500' : 'text-red-500'}`}>
+                      Validado: {validado ? 'Sí' : 'No'}
+                    </p>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <p className="text-gray-400">No hay usuarios referidos.</p>
+            )}
 
             <div className="mt-4 flex justify-between">
               <button 
