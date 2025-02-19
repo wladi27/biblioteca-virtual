@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Background } from "../components/Background";
 import { MobileNav } from "../components/MobileNav";
-import { NivelAlcanzadoComisiones } from "../components/NivelAlcanzadoComisiones";
+import { NivelAlcanzadoComisiones } from "../components/NIvelAlcanzadoComisiones";
+
 
 export const Comisiones = () => {
   const [username, setUsername] = useState("");
