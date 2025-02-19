@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Background } from '../components/Background';
 import { MobileNav } from '../components/MobileNav';
 import { FaUserEdit, FaCode, FaSignOutAlt } from 'react-icons/fa';
-import { Trash2, Clipboard } from 'lucide-react';
+import { Trash2, Clipboard, CheckCircle } from 'lucide-react';
 
 export const Perfil = () => {
   const [username, setUsername] = useState('');
@@ -11,10 +11,11 @@ export const Perfil = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showCodesModal, setShowCodesModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState('');
   const [codes, setCodes] = useState([]);
   const [copyMessage, setCopyMessage] = useState('');
-  const [updateMessage, setUpdateMessage] = useState(''); // Estado para el mensaje de actualización
-  const [step, setStep] = useState(1); // Estado para controlar el paso del formulario
+  const [isCopied, setIsCopied] = useState(false);
+  const [aporteVerificado, setAporteVerificado] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,13 +23,24 @@ export const Perfil = () => {
     if (usuario) {
       const userData = JSON.parse(usuario);
       setUsername(userData.nombre_completo);
-      setUserData(userData); // Guardar datos del usuario
+      setUserData(userData);
+      checkAporte(userData._id);
     }
   }, []);
 
-  const handleEditProfile = () => {
-    setShowUpdateModal(true);
-    setStep(1); // Reiniciar el paso al abrir el modal
+  const checkAporte = async (userId) => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/aportes/`);
+      if (response.ok) {
+        const data = await response.json();
+        const existeAporte = data.some(aporte => aporte.usuarioId === userId && aporte.aporte === true);
+        setAporteVerificado(existeAporte);
+      } else {
+        console.error('Error al verificar el aporte');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
   };
 
   const handleGenerateCode = async () => {
@@ -96,7 +108,11 @@ export const Perfil = () => {
   const handleCopyToClipboard = (code) => {
     navigator.clipboard.writeText(code).then(() => {
       setCopyMessage('Código copiado al portapapeles');
-      setTimeout(() => setCopyMessage(''), 2000); // Mensaje se oculta después de 2 segundos
+      setIsCopied(true);
+      setTimeout(() => {
+        setCopyMessage('');
+        setIsCopied(false);
+      }, 2000);
     }).catch((error) => {
       console.error('Error al copiar el código:', error);
     });
@@ -112,23 +128,15 @@ export const Perfil = () => {
       });
       if (response.ok) {
         const updatedUser = await response.json();
-        localStorage.setItem('usuario', JSON.stringify(updatedUser.usuario)); // Actualizar usuario en localStorage
+        localStorage.setItem('usuario', JSON.stringify(updatedUser.usuario));
         setUserData(updatedUser.usuario);
-        setUpdateMessage('Perfil actualizado exitosamente.'); // Mensaje de éxito
+        setUpdateMessage('Perfil actualizado exitosamente.');
       } else {
-        setUpdateMessage('Error al actualizar el perfil.'); // Mensaje de error
+        setUpdateMessage('Error al actualizar el perfil.');
       }
     } catch (error) {
-      setUpdateMessage('Error al actualizar el perfil.'); // Mensaje de error
+      setUpdateMessage('Error al actualizar el perfil.');
     }
-  };
-
-  const handleNextStep = () => {
-    setStep(prevStep => prevStep + 1);
-  };
-
-  const handlePreviousStep = () => {
-    setStep(prevStep => prevStep - 1);
   };
 
   return (
@@ -137,12 +145,30 @@ export const Perfil = () => {
       <MobileNav />
 
       <div className="w-full max-w-7xl mx-auto px-4 py-16 flex-grow bg-opacity-65 bg-gray-800 rounded-2xl shadow-lg md:min-w-[600px]">
-      <h1 className="text-4xl font-bold mb-4">
-          Perfil
-        </h1>
+        <h1 className="text-4xl font-bold mb-4">Perfil</h1>
         <hr />
+
+        <div className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">ID de Usuario</h2>
+            <span className="text-gray-300">{userData._id}</span>
+            <p className={`text-lg ${aporteVerificado ? 'text-green-500' : 'text-red-500'}`}>
+              {aporteVerificado ? 'Verificado' : 'Sin Verificar'}
+            </p>
+          </div>
+          {isCopied ? (
+            <CheckCircle className="text-green-500" size={24} />
+          ) : (
+            <Clipboard
+              className="text-blue-500 hover:text-blue-400 transition-colors cursor-pointer"
+              size={24}
+              onClick={() => handleCopyToClipboard(userData._id)}
+            />
+          )}
+        </div>
+
         <div className="pt-6 flex flex-col items-center gap-8 mb-8">
-          <div className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center cursor-pointer w-full max-w-md" onClick={handleEditProfile}>
+          <div className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center cursor-pointer w-full max-w-md" onClick={() => setShowUpdateModal(true)}>
             <FaUserEdit className="text-3xl mr-4" />
             <div>
               <h2 className="text-xl font-semibold">Editar Perfil</h2>
@@ -164,9 +190,129 @@ export const Perfil = () => {
           </div>
         </div>
 
+        {/* Modal para actualizar perfil */}
+        {showUpdateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div className="bg-gray-800 p-4 rounded-lg shadow-lg text-center max-h-[80vh] overflow-y-auto">
+              <h2 className="text-xl font-semibold mb-4">Actualizar Perfil</h2>
+              {updateMessage && <div className="mb-4 text-green-400">{updateMessage}</div>}
+              <form onSubmit={handleUpdateProfile} className="flex flex-col items-center">
+                <label className="text-left w-full mb-1" htmlFor="nombreCompleto">Nombre Completo</label>
+                <input
+                  id="nombreCompleto"
+                  type="text"
+                  placeholder="Nombre Completo"
+                  value={userData.nombre_completo || ''}
+                  onChange={(e) => setUserData({ ...userData, nombre_completo: e.target.value })}
+                  className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
+                  required
+                />
+
+                <label className="text-left w-full mb-1" htmlFor="correoElectronico">Correo Electrónico</label>
+                <input
+                  id="correoElectronico"
+                  type="email"
+                  placeholder="Correo Electrónico"
+                  value={userData.correo_electronico || ''}
+                  onChange={(e) => setUserData({ ...userData, correo_electronico: e.target.value })}
+                  className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
+                  required
+                />
+
+                <label className="text-left w-full mb-1" htmlFor="lineaLlamadas">Número de Línea de Llamadas</label>
+                <input
+                  id="lineaLlamadas"
+                  type="text"
+                  placeholder="Número de Línea de Llamadas"
+                  value={userData.linea_llamadas || ''}
+                  onChange={(e) => setUserData({ ...userData, linea_llamadas: e.target.value })}
+                  className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
+                />
+
+                <label className="text-left w-full mb-1" htmlFor="lineaWhatsApp">Número de Línea de WhatsApp</label>
+                <input
+                  id="lineaWhatsApp"
+                  type="text"
+                  placeholder="Número de Línea de WhatsApp"
+                  value={userData.linea_whatsapp || ''}
+                  onChange={(e) => setUserData({ ...userData, linea_whatsapp: e.target.value })}
+                  className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
+                />
+
+                <div className="hidden">
+                  <label className="text-left w-full mb-1" htmlFor="numeroCuenta">Número de Cuenta</label>
+                  <input
+                    id="numeroCuenta"
+                    type="text"
+                    placeholder="Número de Cuenta"
+                    value={userData.cuenta_numero || ''}
+                    readOnly
+                    className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
+                  />
+
+                  <label className="text-left w-full mb-1" htmlFor="banco">Banco</label>
+                  <input
+                    id="banco"
+                    type="text"
+                    placeholder="Banco"
+                    value={userData.banco || ''}
+                    readOnly
+                    className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
+                  />
+
+                  <label className="text-left w-full mb-1" htmlFor="titularCuenta">Titular de Cuenta</label>
+                  <input
+                    id="titularCuenta"
+                    type="text"
+                    placeholder="Titular de Cuenta"
+                    value={userData.titular_cuenta || ''}
+                    readOnly
+                    className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
+                  />
+                </div>
+
+                <label className="text-left w-full mb-1" htmlFor="dni">CC</label>
+                <input
+                  id="dni"
+                  type="text"
+                  placeholder="DNI"
+                  value={userData.dni || ''}
+                  onChange={(e) => setUserData({ ...userData, dni: e.target.value })}
+                  className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
+                  required
+                />
+
+                <label className="text-left w-full mb-1" htmlFor="nombreUsuario">Nombre de Usuario</label>
+                <input
+                  id="nombreUsuario"
+                  type="text"
+                  placeholder="Nombre de Usuario"
+                  value={userData.nombre_usuario || ''}
+                  onChange={(e) => setUserData({ ...userData, nombre_usuario: e.target.value })}
+                  className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
+                  required
+                />
+
+                <button
+                  type="submit"
+                  className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Actualizar
+                </button>
+              </form>
+              <button
+                className="mt-4 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
+                onClick={() => setShowUpdateModal(false)}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
+
         {showCodesModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="bg-gray-800 p-8 rounded-lg shadow-lg text-center">
+            <div className="bg-gray-800 p-4 rounded-lg shadow-lg text-center max-h-[80vh] overflow-y-auto">
               <h2 className="text-2xl font-semibold mb-4">Códigos de Referido</h2>
               <button
                 className="mb-4 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
@@ -215,7 +361,7 @@ export const Perfil = () => {
 
         {showLogoutModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="bg-gray-800 p-8 rounded-lg shadow-lg text-center">
+            <div className="bg-gray-800 p-4 rounded-lg shadow-lg text-center">
               <h2 className="text-xl font-semibold mb-4">¿Estás seguro de que deseas cerrar sesión?</h2>
               <div className="flex justify-center gap-4">
                 <button
@@ -231,193 +377,6 @@ export const Perfil = () => {
                   Cancelar
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {showUpdateModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="bg-gray-800 p-8 rounded-lg shadow-lg text-center">
-              <h2 className="text-xl font-semibold mb-4">Actualizar Perfil</h2>
-              {updateMessage && <div className="mb-4 text-green-400">{updateMessage}</div>} {/* Mensaje de actualización */}
-              <form onSubmit={handleUpdateProfile} className="flex flex-col items-center">
-                {step === 1 && (
-                  <>
-                    <label className="text-left w-full mb-1" htmlFor="nombreCompleto">Nombre Completo</label>
-                    <input
-                      id="nombreCompleto"
-                      type="text"
-                      placeholder="Nombre Completo"
-                      value={userData.nombre_completo || ''}
-                      onChange={(e) => setUserData({ ...userData, nombre_completo: e.target.value })}
-                      className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                      required
-                    />
-                    
-                    <label className="text-left w-full mb-1" htmlFor="correoElectronico">Correo Electrónico</label>
-                    <input
-                      id="correoElectronico"
-                      type="email"
-                      placeholder="Correo Electrónico"
-                      value={userData.correo_electronico || ''}
-                      onChange={(e) => setUserData({ ...userData, correo_electronico: e.target.value })}
-                      className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                      required
-                    />
-
-                    <div className="flex justify-between w-full mt-4">
-                      <button
-                        type="button"
-                        className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-                        onClick={handleNextStep}
-                      >
-                        Siguiente
-                      </button>
-                      <button
-                        type="button"
-                        className="bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
-                        onClick={() => setShowUpdateModal(false)}
-                      >
-                        Cerrar
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {step === 2 && (
-                  <>
-                    <label className="text-left w-full mb-1" htmlFor="lineaLlamadas">Número de Línea de Llamadas</label>
-                    <input
-                      id="lineaLlamadas"
-                      type="text"
-                      placeholder="Número de Línea de Llamadas"
-                      value={userData.linea_llamadas || ''}
-                      onChange={(e) => setUserData({ ...userData, linea_llamadas: e.target.value })}
-                      className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                    />
-                    
-                    <label className="text-left w-full mb-1" htmlFor="lineaWhatsApp">Número de Línea de WhatsApp</label>
-                    <input
-                      id="lineaWhatsApp"
-                      type="text"
-                      placeholder="Número de Línea de WhatsApp"
-                      value={userData.linea_whatsapp || ''}
-                      onChange={(e) => setUserData({ ...userData, linea_whatsapp: e.target.value })}
-                      className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                    />
-                    
-                    <div className="flex justify-between w-full mt-4">
-                      <button
-                        type="button"
-                        className="bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
-                        onClick={handlePreviousStep}
-                      >
-                        Anterior
-                      </button>
-                      <button
-                        type="button"
-                        className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-                        onClick={handleNextStep}
-                      >
-                        Siguiente
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {step === 3 && (
-                  <>
-                    <label className="text-left w-full mb-1" htmlFor="numeroCuenta">Número de Cuenta</label>
-                    <input
-                      id="numeroCuenta"
-                      type="text"
-                      placeholder="Número de Cuenta"
-                      value={userData.cuenta_numero || ''}
-                      onChange={(e) => setUserData({ ...userData, cuenta_numero: e.target.value })}
-                      className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                    />
-                    
-                    <label className="text-left w-full mb-1" htmlFor="banco">Banco</label>
-                    <input
-                      id="banco"
-                      type="text"
-                      placeholder="Banco"
-                      value={userData.banco || ''}
-                      onChange={(e) => setUserData({ ...userData, banco: e.target.value })}
-                      className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                    />
-                    
-                    <label className="text-left w-full mb-1" htmlFor="titularCuenta">Titular de Cuenta</label>
-                    <input
-                      id="titularCuenta"
-                      type="text"
-                      placeholder="Titular de Cuenta"
-                      value={userData.titular_cuenta || ''}
-                      onChange={(e) => setUserData({ ...userData, titular_cuenta: e.target.value })}
-                      className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                    />
-                    
-                    <div className="flex justify-between w-full mt-4">
-                      <button
-                        type="button"
-                        className="bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
-                        onClick={handlePreviousStep}
-                      >
-                        Anterior
-                      </button>
-                      <button
-                        type="button"
-                        className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-                        onClick={handleNextStep}
-                      >
-                        Siguiente
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {step === 4 && (
-                  <>
-                    <label className="text-left w-full mb-1" htmlFor="dni">DNI</label>
-                    <input
-                      id="dni"
-                      type="text"
-                      placeholder="DNI"
-                      value={userData.dni || ''}
-                      onChange={(e) => setUserData({ ...userData, dni: e.target.value })}
-                      className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                      required
-                    />
-                    
-                    <label className="text-left w-full mb-1" htmlFor="nombreUsuario">Nombre de Usuario</label>
-                    <input
-                      id="nombreUsuario"
-                      type="text"
-                      placeholder="Nombre de Usuario"
-                      value={userData.nombre_usuario || ''}
-                      onChange={(e) => setUserData({ ...userData, nombre_usuario: e.target.value })}
-                      className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                      required
-                    />
-                    
-                    <div className="flex justify-between w-full mt-4">
-                      <button
-                        type="button"
-                        className="bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
-                        onClick={handlePreviousStep}
-                      >
-                        Anterior
-                      </button>
-                      <button
-                        type="submit"
-                        className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-                      >
-                        Actualizar
-                      </button>
-                    </div>
-                  </>
-                )}
-              </form>
             </div>
           </div>
         )}

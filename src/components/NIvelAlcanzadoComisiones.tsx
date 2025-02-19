@@ -112,8 +112,8 @@ export const NivelAlcanzadoComisiones = () => {
     }
   };
 
-  const isRetiroPendiente = (monto) => {
-    return retiros.some(retiro => retiro.monto === monto && retiro.status === 'pendiente');
+  const isRetiroExistente = (monto) => {
+    return retiros.some(retiro => retiro.monto === monto);
   };
 
   const renderAcordeon = (nivel) => {
@@ -129,7 +129,7 @@ export const NivelAlcanzadoComisiones = () => {
           onClick={() => toggleAcordeon(nivel)}
         >
           <h3 className="text-lg font-semibold">{`Nivel ${nivel}`}</h3>
-          <span className="text-sm text-green-500">
+          <span className="text-sm text-green-500 mx-4">
             {comision ? `Comisión: COP ${montoComision}` : 'No disponible'}
           </span>
           {openAcordeon[nivel] ? <FaChevronUp /> : <FaChevronDown />}
@@ -137,19 +137,17 @@ export const NivelAlcanzadoComisiones = () => {
         {openAcordeon[nivel] && (
           <div className="bg-gray-900 p-4 rounded-lg mt-2 flex justify-between">
             <p className="text-gray-400">
-              Comisión: COP {montoComision}
+              Comisión: COP <span>{montoComision}</span>
             </p>
-            {isRetiroPendiente(montoComision) ? (
-              <span className="text-yellow-500">
-                {`Estado: Pendiente`}
-              </span>
-            ) : (
+            {!isRetiroExistente(montoComision) ? (
               <button
                 className="bg-blue-500 text-white py-1 px-3 rounded"
                 onClick={() => handleRetirar(montoComision)}
               >
                 Retirar
               </button>
+            ) : (
+              <span className="text-red-500 mx-4">Retiro ya registrado</span>
             )}
           </div>
         )}
@@ -174,12 +172,12 @@ export const NivelAlcanzadoComisiones = () => {
         </div>
       </div>
       <div className="mt-4 bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center">           
-            <div>
-              <h2 className="text-xl font-semibold">Nivel Máximo</h2>
-              <p className="text-gray-400">12</p>
-            </div>
-            <br />
-          </div>
+        <div>
+          <h2 className="text-xl font-semibold">Nivel Máximo</h2>
+          <p className="text-gray-400">12</p>
+        </div>
+        <br />
+      </div>
       {mensajeRetiro && (
         <div className="mt-4 p-2 bg-green-500 text-white rounded">
           {mensajeRetiro}

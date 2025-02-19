@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom';
-import { Home, Users, DollarSign, User } from 'lucide-react';
+import { Home, Users, CheckCircle, User, Edit } from 'lucide-react'; // Importa el icono CheckCircle
 
 const navItems = [
   { icon: Home, label: 'Home', href: '/BV/dashboard' },
   { icon: Users, label: 'Red', href: '/BV/red' },
-  { icon: User, label: 'Perfil', href: '/BV/perfil' },
+  { icon: CheckCircle, label: 'Validar', href: '/BV/validar' }, // Ítem de validación agregado
+  { icon: Edit, label: 'Publicar', href: '/BV/post' },
+  { icon: User, label: 'Perfil', href: '/BV/perfil' }, 
 ];
 
 export function AdminNav() {

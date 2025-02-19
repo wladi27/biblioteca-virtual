@@ -81,7 +81,7 @@ export const RedAdmin = () => {
               <li key={usuario._id} className="mb-2">
                 <div className="flex items-center">
                   <User className="mr-2" />
-                  {usuario.nombre_completo}
+                  {usuario._id} | {usuario.nombre_completo}
                 </div>
               </li>
             ))}

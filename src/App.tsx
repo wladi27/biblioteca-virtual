@@ -12,6 +12,12 @@ import { LoginAdmin } from './pages/LoginAdmin';
 import { Admin } from './pages/Admin';
 import { RedAdmin } from './pages/RedAdmin';
 import { PerfilAdmin } from './pages/PerfilAdmin';
+import { CreatePublication } from './pages/Post';
+import { Validar } from './pages/Validar';
+import { TotalUsuarios } from './pages/TotalUsuarios';
+import { TotalReferralCodes } from './pages/TotalCodigos';
+import { TotalWithdrawals } from './pages/TotalRetiros';
+import { TotalApprovedContributions } from './pages/TotalAportes';
 
 function App() {
   return (
@@ -29,6 +35,12 @@ function App() {
         <Route path="/BV/dashboard" element={<Admin />} />
         <Route path="/BV/red" element={<RedAdmin />} />
         <Route path="/BV/perfil" element={<PerfilAdmin />} />
+        <Route path="/BV/post" element={<CreatePublication />} />
+        <Route path="/BV/validar" element={<Validar />} />
+        <Route path="/BV/usuarios" element={<TotalUsuarios />} />
+        <Route path="/BV/codes" element={ <TotalReferralCodes />} />
+        <Route path="/BV/retiros" element={ <TotalWithdrawals />} />
+        <Route path="/BV/aportes" element={<TotalApprovedContributions />} />
       </Routes>
     </Router>
   );
