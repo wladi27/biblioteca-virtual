@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Background } from '../components/Background';
 import { MobileNav } from '../components/MobileNav';
 import { FaDollarSign, FaCode, FaHistory } from 'react-icons/fa';
-import { NivelAlcanzadoComponet } from '../components/NivelAlcanzado';
+import { NivelAlcanzadoComponet } from '../components/NIvelAlcanzado';
+
 
 export const Dashboard = () => {
   const [comisiones, setComisiones] = useState(0);
