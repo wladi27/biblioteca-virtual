@@ -66,14 +66,17 @@ export const Admin = () => {
       if (!response.ok) throw new Error('Error al obtener los datos del usuario');
       const usuarioData = await response.json();
       setUsuarioSeleccionado(usuarioData);
-      setRetiroSeleccionado(retiroId);
-      // Llamar a obtenerReferidos después de obtener el usuario
+      
+      // Obtener el retiro completo y establecerlo
+      const retiroData = listaRetiros.find(retiro => retiro._id === retiroId);
+      setRetiroSeleccionado(retiroData);
+      
       await obtenerReferidos(usuarioId);
       setModalVisible(true);
     } catch (error) {
       setError(error.message);
     }
-  }, [todosLosUsuarios, aportes]); // Asegurarse de que estos datos estén disponibles
+  }, [listaRetiros]);
 
   const obtenerReferidos = async (usuarioId) => {
     try {
@@ -130,7 +133,7 @@ export const Admin = () => {
     if (!retiroSeleccionado) return;
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals/${retiroSeleccionado}`, {
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals/${retiroSeleccionado._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nuevoEstado })
@@ -151,7 +154,7 @@ export const Admin = () => {
     if (!retiroSeleccionado) return;
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals/${retiroSeleccionado}`, {
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals/${retiroSeleccionado._id}`, {
         method: 'DELETE'
       });
 
@@ -242,7 +245,7 @@ export const Admin = () => {
             <h2 className="text-2xl font-bold mb-4">Detalles del Usuario</h2>
             {['nombre_completo', 'dni', 'linea_llamadas', 'linea_whatsapp', 'banco', 'cuenta_numero', 'titular_cuenta', 'correo_electronico'].map((field, index) => (
               <div key={index} className="mb-2 flex justify-between items-center">
-                <span><strong>{field.replace('_', ' ').toUpperCase()}:</strong> {usuarioSeleccionado[field]}</span>
+                <span><strong>{field === 'dni' ? 'CC' : field.replace('_', ' ').toUpperCase()}:</strong> {usuarioSeleccionado[field]}</span>
                 <FaClipboard 
                   className="cursor-pointer text-green-500"
                   onClick={() => copiarAlPortapapeles(usuarioSeleccionado[field])}
@@ -268,24 +271,45 @@ export const Admin = () => {
             )}
 
             <div className="mt-4 flex justify-between">
-              <button 
-                onClick={() => cambiarEstadoRetiro('aceptado')}
-                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-200 ease-in-out mr-2"
-              >
-                Aceptar
-              </button>
-              <button 
-                onClick={() => cambiarEstadoRetiro('pagado')}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded transition duration-200 ease-in-out mr-2"
-              >
-                Pagar
-              </button>
-              <button 
-                onClick={eliminarRetiro}
-                className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200 ease-in-out"
-              >
-                Rechazar
-              </button>
+              {retiroSeleccionado && retiroSeleccionado.status === 'pendiente' && (
+                <>
+                  <button 
+                    onClick={() => cambiarEstadoRetiro('aceptado')}
+                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-200 ease-in-out mr-2"
+                  >
+                    Aceptar
+                  </button>
+                  <button 
+                    onClick={eliminarRetiro}
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200 ease-in-out"
+                  >
+                    Rechazar
+                  </button>
+                </>
+              )}
+
+              {retiroSeleccionado && retiroSeleccionado.status === 'aceptado' && (
+                <>
+                  <button 
+                    onClick={() => cambiarEstadoRetiro('pagado')}
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded transition duration-200 ease-in-out mr-2"
+                  >
+                    Pagar
+                  </button>
+                  <button 
+                    onClick={eliminarRetiro}
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200 ease-in-out"
+                  >
+                    Rechazar
+                  </button>
+                </>
+              )}
+
+              {retiroSeleccionado && retiroSeleccionado.status === 'pagado' && (
+                <div className="text-gray-500">
+                  Todos los botones están deshabilitados.
+                </div>
+              )}
             </div>
 
             <button 
@@ -294,7 +318,6 @@ export const Admin = () => {
             >
               Cerrar
             </button>
-            <br /><br />
           </div>
         </div>
       )}

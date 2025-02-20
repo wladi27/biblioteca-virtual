@@ -18,6 +18,7 @@ import { TotalUsuarios } from './pages/TotalUsuarios';
 import { TotalReferralCodes } from './pages/TotalCodigos';
 import { TotalWithdrawals } from './pages/TotalRetiros';
 import { TotalApprovedContributions } from './pages/TotalAportes';
+import { CrudComisiones } from './pages/CrudComisiones';
 
 function App() {
   return (
@@ -40,7 +41,7 @@ function App() {
         <Route path="/BV/usuarios" element={<TotalUsuarios />} />
         <Route path="/BV/codes" element={ <TotalReferralCodes />} />
         <Route path="/BV/retiros" element={ <TotalWithdrawals />} />
-        <Route path="/BV/aportes" element={<TotalApprovedContributions />} />
+        <Route path="/BV/comisiones" element={<CrudComisiones />} />
       </Routes>
     </Router>
   );

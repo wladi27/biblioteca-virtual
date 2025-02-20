@@ -18,27 +18,26 @@ export const Red = () => {
       const userData = JSON.parse(usuario);
       setUsername(userData.nombre_completo);
       setNivelUsuario(userData.nivel || 0);
-
-      const fetchPiramideData = async () => {
-        try {
-          const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/piramide/${userData._id}`);
-          if (response.ok) {
-            const data = await response.json();
-            setPiramideData(data.hijos || []);
-            calcularNivelesCompletados(data.hijos || []);
-          } else {
-            console.error('Error al obtener la data de la pirámide');
-          }
-        } catch (error) {
-          console.error('Error:', error);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      fetchPiramideData();
+      fetchPiramideData(userData._id);
     }
   }, []);
+
+  const fetchPiramideData = async (userId) => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/piramide/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setPiramideData(data.hijos || []);
+        calcularNivelesCompletados(data.hijos || []);
+      } else {
+        console.error('Error al obtener la data de la pirámide');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const calcularNivelesCompletados = (data) => {
     let nivelesCompletados = 0;
@@ -70,6 +69,7 @@ export const Red = () => {
     if (nivel > 12 || !data.length) return null;
 
     const completado = calcularCompletitud(nivel, data.length);
+    const cantidadEsperada = Math.pow(3, nivel); // 3^n
 
     return (
       <div className="mb-4" key={`nivel-${nivel}`}>
@@ -77,21 +77,27 @@ export const Red = () => {
           className="bg-gray-800 p-4 rounded-lg flex justify-between items-center cursor-pointer transition-transform transform hover:scale-105"
           onClick={() => toggleAcordeon(nivel)}
         >
-          <h3 className="text-lg font-semibold">{`Nivel ${nivel}`}</h3>
-          <span className={`text-sm ${completado ? 'text-green-500' : 'text-red-500'}`}>
-            {completado ? 'Completado' : 'No Completado'}
-          </span>
+          <div className="flex flex-col">
+            <h3 className="text-lg font-semibold">
+              {`Nivel ${nivel}`}
+            </h3>
+            <span className="text-sm text-gray-400">
+              {`${data.length} / ${cantidadEsperada} usuarios - ${completado ? 'Completado' : 'No Completado'}`}
+            </span>
+          </div>
           {openAcordeon[nivel] ? <FaChevronUp /> : <FaChevronDown />}
         </div>
         {openAcordeon[nivel] && (
-          <ul className="pl-4 mt-2">
-            {data.map((usuario) => (
-              <li key={usuario._id} className="mb-2 flex items-center transition-colors hover:bg-gray-700 p-2 rounded-md">
-                <User className="mr-2" />
-                 {usuario.nombre_completo}
-              </li>
-            ))}
-          </ul>
+          <div className="pl-4 mt-2">
+            <ul className="mt-2">
+              {data.map((usuario) => (
+                <li key={usuario._id} className="mb-2 flex items-center transition-colores hover:bg-gray-700 p-2 rounded-md">
+                  <User className="mr-2" />
+                  {usuario.nombre_completo}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     );

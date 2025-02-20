@@ -62,6 +62,7 @@ export const RedAdmin = () => {
     if (nivel > 12 || !data.length) return null;
 
     const completado = calcularCompletitud(nivel, data.length);
+    const cantidadEsperada = Math.pow(3, nivel); // 3^n
 
     return (
       <div className="mb-4" key={`nivel-${nivel}`}>
@@ -69,7 +70,7 @@ export const RedAdmin = () => {
           className="bg-gray-800 p-2 rounded-lg flex justify-between items-center cursor-pointer"
           onClick={() => toggleAcordeon(nivel)}
         >
-          <h3 className="text-lg font-semibold">{`Nivel ${nivel}`}</h3>
+          <h3 className="text-lg font-semibold">{`Nivel ${nivel} | ${data.length} - ${cantidadEsperada} usuarios`}</h3>
           <span className={`text-sm ${completado ? 'text-green-500' : 'text-red-500'}`}>
             {completado ? 'Completado' : 'No Completado'}
           </span>

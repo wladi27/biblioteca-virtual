@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Background } from '../components/Background';
 import { MobileNav } from '../components/MobileNav';
-import { FaSignOutAlt } from 'react-icons/fa';
+import { FaSignOutAlt, FaMoneyBillWave } from 'react-icons/fa';
 import { AdminNav } from '../components/AdminNav';
 
 export const PerfilAdmin = () => {
@@ -33,7 +33,23 @@ export const PerfilAdmin = () => {
         <h1 className="text-4xl font-bold mb-4">Perfil Admin</h1>
         <hr />
         <div className="pt-6 flex flex-col items-center gap-8 mb-8">
-          <div className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center cursor-pointer w-full max-w-md" onClick={() => setShowLogoutModal(true)}>
+          
+          {/* Tarjeta de Comisiones */}
+          <div
+            className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center cursor-pointer w-full max-w-md"
+            onClick={() => navigate('/BV/comisiones')}
+          >
+            <FaMoneyBillWave className="text-3xl mr-4" />
+            <div>
+              <h2 className="text-xl font-semibold">Comisiones</h2>
+            </div>
+          </div>
+
+          {/* Tarjeta de Cerrar Sesión */}
+          <div
+            className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center cursor-pointer w-full max-w-md"
+            onClick={() => setShowLogoutModal(true)}
+          >
             <FaSignOutAlt className="text-3xl mr-4" />
             <div>
               <h2 className="text-xl font-semibold">Cerrar Sesión</h2>
