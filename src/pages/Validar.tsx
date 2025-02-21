@@ -109,9 +109,14 @@ export const Validar = () => {
                         })
                         .map((pub) => (
                             <li key={pub._id} className="bg-gray-800 p-4 rounded-md">
-                                <h3 className="text-lg font-bold">ID Usuario: {pub.usuarioId}</h3>
+                                <p>ID Usuario: {pub.usuarioId}</p>
                                 <p>Nombre Usuario: {pub.usuario?.nombre_completo || 'Usuario no encontrado'}</p>
                                 <p>Status: {pub.aporte ? 'Validado' : 'No Validado'}</p>
+                                <br />
+                                <hr />
+                                <br />
+                                <p>ID Padre: {pub.usuario?.padre?.id || 'No disponible'}</p>
+                                <p>Nombre Padre: {pub.usuario?.padre?.nombre || 'No disponible'}</p>
                                 <div className="flex justify-between mt-4">
                                     <button
                                         onClick={() => handleValidate(pub._id)}

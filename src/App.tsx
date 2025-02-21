@@ -42,6 +42,8 @@ function App() {
         <Route path="/BV/codes" element={ <TotalReferralCodes />} />
         <Route path="/BV/retiros" element={ <TotalWithdrawals />} />
         <Route path="/BV/comisiones" element={<CrudComisiones />} />
+        <Route path="/BV/aportes" element={<TotalApprovedContributions />} />
+
       </Routes>
     </Router>
   );

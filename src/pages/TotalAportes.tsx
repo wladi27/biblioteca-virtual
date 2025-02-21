@@ -19,7 +19,15 @@ export const TotalApprovedContributions = () => {
         const data = await response.json();
         // Filtrar solo los aportes aprobados
         const approvedContributions = data.filter(contribution => contribution.aporte);
-        setContributions(approvedContributions);
+
+        // Obtener información del usuario para cada aporte
+        const contributionsWithUserInfo = await Promise.all(approvedContributions.map(async (contribution) => {
+          const usuarioResponse = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${contribution.usuarioId}`);
+          const usuarioData = await usuarioResponse.json();
+          return { ...contribution, usuario: usuarioData };
+        }));
+
+        setContributions(contributionsWithUserInfo);
       } else {
         throw new Error('Error al obtener los aportes');
       }
@@ -65,7 +73,17 @@ export const TotalApprovedContributions = () => {
           {contributionsFiltradas.map((contribution) => (
             <li key={contribution._id} className="bg-gray-800 p-4 rounded-md">
               <h3 className="text-lg font-bold">Usuario ID: {contribution.usuarioId}</h3>
+              <p>Nombre Usuario: {contribution.usuario?.nombre_completo || 'No disponible'}</p>
               <p>Aporte Aprobado: {contribution.aporte ? 'Sí' : 'No'}</p>
+              {contribution.usuario?.padre && (
+                <>
+                <br />
+                <hr />
+                <br />
+                  <p>ID Padre: {contribution.usuario.padre.id || 'No disponible'}</p>
+                  <p>Nombre Padre: {contribution.usuario.padre.nombre || 'No disponible'}</p>
+                </>
+              )}
             </li>
           ))}
         </ul>
@@ -74,6 +92,7 @@ export const TotalApprovedContributions = () => {
           <p className="text-gray-400 text-center mt-4">No se encontraron aportes aprobados.</p>
         )}
       </div>
+      <br /><br />
 
       <AdminNav />
     </div>
