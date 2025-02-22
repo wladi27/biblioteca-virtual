@@ -124,7 +124,7 @@ export const Perfil = () => {
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/auth/${userData._id}`, {
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/auth/usuario/${userData._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData),
