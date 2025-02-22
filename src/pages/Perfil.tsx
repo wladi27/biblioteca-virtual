@@ -4,6 +4,7 @@ import { Background } from '../components/Background';
 import { MobileNav } from '../components/MobileNav';
 import { FaUserEdit, FaCode, FaSignOutAlt } from 'react-icons/fa';
 import { Trash2, Clipboard, CheckCircle } from 'lucide-react';
+import ChangePasswordModal from '../components/ChangePasswordModal';
 
 export const Perfil = () => {
   const [username, setUsername] = useState('');
@@ -16,7 +17,9 @@ export const Perfil = () => {
   const [copyMessage, setCopyMessage] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [aporteVerificado, setAporteVerificado] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const navigate = useNavigate();
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     const usuario = localStorage.getItem('usuario');
@@ -139,9 +142,34 @@ export const Perfil = () => {
     }
   };
 
+  const handleChangePassword = async (newPassword) => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/auth/password/${userData._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nuevaContraseña: newPassword }),
+      });
+      if (response.ok) {
+        setSuccessMessage('Contraseña actualizada exitosamente.'); // Establecer el mensaje de éxito
+        setShowChangePasswordModal(false); // Cerrar el modal
+
+        // Ocultar el mensaje después de 5 segundos
+        setTimeout(() => {
+          setSuccessMessage('');
+        }, 5000);
+      } else {
+        setUpdateMessage('Error al actualizar la contraseña.');
+      }
+    } catch (error) {
+      setUpdateMessage('Error al actualizar la contraseña.');
+    }
+  };
+  
+
   return (
     <div className="min-h-screen flex flex-col text-white">
       <Background />
+      
       <MobileNav />
 
       <div className="w-full max-w-7xl mx-auto px-4 py-16 flex-grow bg-opacity-65 bg-gray-800 rounded-2xl shadow-lg md:min-w-[600px]">
@@ -167,6 +195,13 @@ export const Perfil = () => {
           )}
         </div>
 
+        {/* Mostrar mensaje de éxito */}
+      {successMessage && (
+        <div className="bg-green-500 text-white p-4 rounded-md fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
+          {successMessage}
+        </div>
+      )}
+
         <div className="pt-6 flex flex-col items-center gap-8 mb-8">
           <div className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center cursor-pointer w-full max-w-md" onClick={() => setShowUpdateModal(true)}>
             <FaUserEdit className="text-3xl mr-4" />
@@ -179,6 +214,13 @@ export const Perfil = () => {
             <FaCode className="text-3xl mr-4" />
             <div>
               <h2 className="text-xl font-semibold">Código de Referido</h2>
+            </div>
+          </div>
+
+          <div className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center cursor-pointer w-full max-w-md" onClick={() => setShowChangePasswordModal(true)}>
+            <FaUserEdit className="text-3xl mr-4" />
+            <div>
+              <h2 className="text-xl font-semibold">Cambiar Contraseña</h2>
             </div>
           </div>
 
@@ -239,38 +281,6 @@ export const Perfil = () => {
                   className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
                 />
 
-                <div className="hidden">
-                  <label className="text-left w-full mb-1" htmlFor="numeroCuenta">Número de Cuenta</label>
-                  <input
-                    id="numeroCuenta"
-                    type="text"
-                    placeholder="Número de Cuenta"
-                    value={userData.cuenta_numero || ''}
-                    readOnly
-                    className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                  />
-
-                  <label className="text-left w-full mb-1" htmlFor="banco">Banco</label>
-                  <input
-                    id="banco"
-                    type="text"
-                    placeholder="Banco"
-                    value={userData.banco || ''}
-                    readOnly
-                    className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                  />
-
-                  <label className="text-left w-full mb-1" htmlFor="titularCuenta">Titular de Cuenta</label>
-                  <input
-                    id="titularCuenta"
-                    type="text"
-                    placeholder="Titular de Cuenta"
-                    value={userData.titular_cuenta || ''}
-                    readOnly
-                    className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                  />
-                </div>
-
                 <label className="text-left w-full mb-1" htmlFor="dni">CC</label>
                 <input
                   id="dni"
@@ -310,6 +320,16 @@ export const Perfil = () => {
           </div>
         )}
 
+        {/* Modal para cambiar contraseña */}
+        {showChangePasswordModal && (
+          <ChangePasswordModal
+            show={showChangePasswordModal}
+            onClose={() => setShowChangePasswordModal(false)}
+            onChangePassword={handleChangePassword}
+          />
+        )}
+
+        {/* Modal para códigos referidos */}
         {showCodesModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
             <div className="bg-gray-800 p-4 rounded-lg shadow-lg text-center max-h-[80vh] overflow-y-auto">
@@ -359,6 +379,7 @@ export const Perfil = () => {
           </div>
         )}
 
+        {/* Modal para cerrar sesión */}
         {showLogoutModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
             <div className="bg-gray-800 p-4 rounded-lg shadow-lg text-center">
