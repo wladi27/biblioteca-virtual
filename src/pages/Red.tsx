@@ -11,6 +11,7 @@ export const Red = () => {
   const [piramideData, setPiramideData] = useState([]);
   const [openAcordeon, setOpenAcordeon] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadedLevels, setLoadedLevels] = useState({}); // Para lazy loading
 
   useEffect(() => {
     const usuario = localStorage.getItem('usuario');
@@ -18,10 +19,11 @@ export const Red = () => {
       const userData = JSON.parse(usuario);
       setUsername(userData.nombre_completo);
       setNivelUsuario(userData.nivel || 0);
-      fetchPiramideData(userData._id);
+      fetchPiramideData(userData._id); // Solo se llama una vez al cargar el componente
     }
   }, []);
 
+  // Función para cargar datos de la pirámide
   const fetchPiramideData = async (userId) => {
     try {
       const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/piramide/${userId}`);
@@ -39,6 +41,24 @@ export const Red = () => {
     }
   };
 
+  // Función para cargar un nivel específico bajo demanda
+  const loadLevel = async (nivel) => {
+    if (loadedLevels[nivel]) return; // Evitar cargar el nivel si ya está cargado
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_URL_LOCAL}/usuarios/piramide/${localStorage.getItem('usuario_id')}?nivel=${nivel}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setLoadedLevels((prev) => ({ ...prev, [nivel]: data.hijos || [] }));
+      }
+    } catch (error) {
+      console.error('Error al cargar el nivel:', error);
+    }
+  };
+
+  // Función para calcular los niveles completados
   const calcularNivelesCompletados = (data) => {
     let nivelesCompletados = 0;
     let currentNivelData = data;
@@ -50,26 +70,32 @@ export const Red = () => {
       } else {
         break;
       }
-      currentNivelData = currentNivelData.flatMap(usuario => usuario.hijos || []);
+      currentNivelData = currentNivelData.flatMap((usuario) => usuario.hijos || []);
     }
 
     setNivelesCompletados(nivelesCompletados);
   };
 
+  // Función para alternar el acordeón
   const toggleAcordeon = (nivel) => {
     setOpenAcordeon((prev) => ({ ...prev, [nivel]: !prev[nivel] }));
+    if (!loadedLevels[nivel]) {
+      loadLevel(nivel); // Cargar el nivel si no está cargado
+    }
   };
 
+  // Función para calcular la completitud de un nivel
   const calcularCompletitud = (nivel, cantidadActual) => {
     const cantidadEsperada = Math.pow(3, nivel);
     return cantidadActual === cantidadEsperada;
   };
 
+  // Función para renderizar un acordeón
   const renderAcordeon = (data, nivel) => {
     if (nivel > 12 || !data.length) return null;
 
     const completado = calcularCompletitud(nivel, data.length);
-    const cantidadEsperada = Math.pow(3, nivel); // 3^n
+    const cantidadEsperada = Math.pow(3, nivel);
 
     return (
       <div className="mb-4" key={`nivel-${nivel}`}>
@@ -78,9 +104,7 @@ export const Red = () => {
           onClick={() => toggleAcordeon(nivel)}
         >
           <div className="flex flex-col">
-            <h3 className="text-lg font-semibold">
-              {`Nivel ${nivel}`}
-            </h3>
+            <h3 className="text-lg font-semibold">{`Nivel ${nivel}`}</h3>
             <span className="text-sm text-gray-400">
               {`${data.length} / ${cantidadEsperada} usuarios - ${completado ? 'Completado' : 'No Completado'}`}
             </span>
@@ -91,9 +115,12 @@ export const Red = () => {
           <div className="pl-4 mt-2">
             <ul className="mt-2">
               {data.map((usuario) => (
-                <li key={usuario._id} className="mb-2 flex items-center transition-colores hover:bg-gray-700 p-2 rounded-md">
+                <li
+                  key={usuario._id}
+                  className="mb-2 flex items-center transition-colores hover:bg-gray-700 p-2 rounded-md"
+                >
                   <User className="mr-2" />
-                  {usuario.nombre_completo}
+                  {usuario.nombre_usuario} {/* Cambiar a nombre_usuario */}
                 </li>
               ))}
             </ul>
@@ -103,18 +130,20 @@ export const Red = () => {
     );
   };
 
+  // Función para renderizar todos los niveles
   const renderTodosLosNiveles = (data) => {
     const niveles = [];
     let currentNivelData = data;
 
     for (let nivel = 1; nivel <= 12; nivel++) {
       niveles.push(renderAcordeon(currentNivelData, nivel));
-      currentNivelData = currentNivelData.flatMap(usuario => usuario.hijos || []);
+      currentNivelData = loadedLevels[nivel] || currentNivelData.flatMap((usuario) => usuario.hijos || []);
     }
 
     return niveles;
   };
 
+  // Preloader mientras se cargan los datos
   const Preloader = () => (
     <div className="flex justify-center items-center h-screen">
       <div className="loader">Cargando...</div>

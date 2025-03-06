@@ -124,34 +124,38 @@ export const NivelAlcanzadoComisiones = () => {
 
     return (
       <div className="mb-4" key={`nivel-${nivel}`}>
-        <div
-          className="bg-gray-800 p-2 rounded-lg flex justify-between items-center cursor-pointer"
-          onClick={() => toggleAcordeon(nivel)}
-        >
-          <h3 className="text-lg font-semibold">{`Nivel ${nivel}`}</h3>
-          <span className="text-sm text-green-500 mx-4">
-            {comision ? `Comisión: COP ${montoComision}` : 'No disponible'}
-          </span>
-          {openAcordeon[nivel] ? <FaChevronUp /> : <FaChevronDown />}
-        </div>
-        {openAcordeon[nivel] && (
-          <div className="bg-gray-900 p-4 rounded-lg mt-2 flex justify-between">
-            <p className="text-gray-400">
-              Comisión: COP <span>{montoComision}</span>
-            </p>
-            {!isRetiroExistente(montoComision) ? (
-              <button
-                className="bg-blue-500 text-white py-1 px-3 rounded"
-                onClick={() => handleRetirar(montoComision)}
-              >
-                Retirar
-              </button>
-            ) : (
-              <span className="text-red-500 mx-4">Retiro ya registrado</span>
-            )}
-          </div>
+  <div
+    className="bg-gray-800 p-2 rounded-lg flex justify-between items-center cursor-pointer"
+    onClick={() => toggleAcordeon(nivel)}
+  >
+    <h3 className="text-lg font-semibold">{`Nivel ${nivel}`}</h3>
+    <span className="text-sm text-green-500 mx-4">
+      {comision ? `Comisión: COP ${montoComision}` : 'No disponible'}
+    </span>
+    {openAcordeon[nivel] ? <FaChevronUp /> : <FaChevronDown />}
+  </div>
+  {openAcordeon[nivel] && (
+    <div className="bg-gray-900 p-4 rounded-lg mt-2">
+      <p className="text-gray-400">
+        Comisión: COP <span>{montoComision}</span>
+      </p>
+      {/* Mueve el botón de retirar aquí */}
+      <div className="flex justify-between">
+        {!isRetiroExistente(montoComision) ? (
+          <button
+            className="bg-blue-500 text-white py-1 px-3 rounded mt-2"
+            onClick={() => handleRetirar(montoComision)}
+          >
+            Retirar
+          </button>
+        ) : (
+          <span className="text-red-500 mx-4">Retiro ya registrado</span>
         )}
       </div>
+    </div>
+  )}
+</div>
+
     );
   };
 
