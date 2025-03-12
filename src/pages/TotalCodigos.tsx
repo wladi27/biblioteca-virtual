@@ -1,17 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Background } from '../components/Background';
 import { AdminNav } from '../components/AdminNav';
 import { FaSearch } from 'react-icons/fa';
+import debounce from 'lodash/debounce'; // Importación de debounce
 
 export const TotalReferralCodes = () => {
   const [referralCodes, setReferralCodes] = useState([]);
   const [filtro, setFiltro] = useState('');
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | null }>(null);
 
+  // Cargar códigos de referencia al montar el componente
   useEffect(() => {
     fetchReferralCodes();
   }, []);
 
+  // Función para obtener los códigos de referencia
   const fetchReferralCodes = async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/referralCodes`);
@@ -27,14 +30,22 @@ export const TotalReferralCodes = () => {
     }
   };
 
-  const handleFiltroChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFiltro(e.target.value);
-  };
-
-  const referralCodesFiltrados = referralCodes.filter(code =>
-    code.code.toLowerCase().includes(filtro.toLowerCase()) ||
-    code.userId.nombre_completo.toLowerCase().includes(filtro.toLowerCase())
+  // Función de filtrado con debounce
+  const handleFiltroChange = useCallback(
+    debounce((value: string) => {
+      setFiltro(value);
+    }, 300),
+    []
   );
+
+  // Filtrar códigos de referencia usando useMemo para evitar recalculos innecesarios
+  const referralCodesFiltrados = useMemo(() => {
+    return referralCodes.filter(
+      (code) =>
+        code.code.toLowerCase().includes(filtro.toLowerCase()) ||
+        code.userId.nombre_completo.toLowerCase().includes(filtro.toLowerCase())
+    );
+  }, [referralCodes, filtro]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -44,7 +55,11 @@ export const TotalReferralCodes = () => {
         <h2 className="text-2xl font-bold mb-6 text-center">Total de Códigos de Referencia</h2>
 
         {message && (
-          <div className={`mb-4 p-4 rounded-md ${message.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
+          <div
+            className={`mb-4 p-4 rounded-md ${
+              message.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+            }`}
+          >
             {message.text}
           </div>
         )}
@@ -54,8 +69,7 @@ export const TotalReferralCodes = () => {
           <input
             type="text"
             placeholder="Filtrar por código o nombre..."
-            value={filtro}
-            onChange={handleFiltroChange}
+            onChange={(e) => handleFiltroChange(e.target.value)}
             className="w-full bg-gray-700 text-white rounded-md py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
