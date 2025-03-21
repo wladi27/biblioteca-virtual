@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Background } from '../components/Background';
 import { MobileNav } from '../components/MobileNav';
 import { FaDollarSign, FaCode, FaHistory } from 'react-icons/fa';
-import { NivelAlcanzadoComponet } from '../components/NIvelAlcanzado';
+import { NivelAlcanzadoComponent } from '../components/NIvelAlcanzado';
 
 
 export const Dashboard = () => {
@@ -140,7 +140,7 @@ Me gustaría hacer una contribución a la biblioteca virtual. ¿Podrías proporc
         <hr className="mb-6" />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <NivelAlcanzadoComponet />
+          <NivelAlcanzadoComponent />
           <div className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center transition-transform transform hover:scale-105">
             <FaCode className="text-3xl mr-4" />
             <div>
