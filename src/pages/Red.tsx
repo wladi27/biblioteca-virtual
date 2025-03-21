@@ -11,7 +11,7 @@ export const Red = () => {
   const [piramideData, setPiramideData] = useState([]);
   const [openAcordeon, setOpenAcordeon] = useState({});
   const [loading, setLoading] = useState(true);
-  const [loadedLevels, setLoadedLevels] = useState({}); // Para lazy loading
+  const [nivelesCompletos, setNivelesCompletos] = useState([]);
 
   useEffect(() => {
     const usuario = localStorage.getItem('usuario');
@@ -19,20 +19,18 @@ export const Red = () => {
       const userData = JSON.parse(usuario);
       setUsername(userData.nombre_completo);
       setNivelUsuario(userData.nivel || 0);
-      fetchPiramideData(userData._id); // Solo se llama una vez al cargar el componente
+      fetchPiramideData(userData._id);
     }
   }, []);
 
-  // Función para cargar datos de la pirámide
   const fetchPiramideData = async (userId) => {
     try {
       const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/piramide/${userId}`);
       if (response.ok) {
         const data = await response.json();
         setPiramideData(data.hijos || []);
+        prepararNivelesCompletos(data.hijos || []);
         calcularNivelesCompletados(data.hijos || []);
-      } else {
-        console.error('Error al obtener la data de la pirámide');
       }
     } catch (error) {
       console.error('Error:', error);
@@ -41,31 +39,37 @@ export const Red = () => {
     }
   };
 
-  // Función para cargar un nivel específico bajo demanda
-  const loadLevel = async (nivel) => {
-    if (loadedLevels[nivel]) return; // Evitar cargar el nivel si ya está cargado
+  const prepararNivelesCompletos = (data) => {
+    const niveles = [];
+    let currentData = data;
+    let nextLevelData = currentData.flatMap(usuario => usuario.hijos || []);
 
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/usuarios/piramide/${localStorage.getItem('usuario_id')}?nivel=${nivel}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setLoadedLevels((prev) => ({ ...prev, [nivel]: data.hijos || [] }));
+    for (let nivel = 1; nivel <= 12; nivel++) {
+      const cantidadEsperada = Math.pow(3, nivel);
+      
+      // Tomar usuarios del siguiente nivel si es necesario
+      if (currentData.length < cantidadEsperada && nextLevelData.length > 0) {
+        const usuariosFaltantes = cantidadEsperada - currentData.length;
+        const usuariosParaTomar = Math.min(usuariosFaltantes, nextLevelData.length);
+        currentData = [...currentData, ...nextLevelData.slice(0, usuariosParaTomar)];
+        nextLevelData = nextLevelData.slice(usuariosParaTomar);
       }
-    } catch (error) {
-      console.error('Error al cargar el nivel:', error);
+
+      niveles[nivel] = currentData.slice(0, cantidadEsperada);
+      currentData = currentData.flatMap(usuario => usuario.hijos || []);
+      nextLevelData = currentData.flatMap(usuario => usuario.hijos || []);
     }
+
+    setNivelesCompletos(niveles);
   };
 
-  // Función para calcular los niveles completados
   const calcularNivelesCompletados = (data) => {
     let nivelesCompletados = 0;
     let currentNivelData = data;
 
     for (let nivel = 1; nivel <= 12; nivel++) {
       const cantidadEsperada = Math.pow(3, nivel);
-      if (currentNivelData.length === cantidadEsperada) {
+      if (currentNivelData.length >= cantidadEsperada) {
         nivelesCompletados++;
       } else {
         break;
@@ -76,107 +80,116 @@ export const Red = () => {
     setNivelesCompletados(nivelesCompletados);
   };
 
-  // Función para alternar el acordeón
   const toggleAcordeon = (nivel) => {
-    setOpenAcordeon((prev) => ({ ...prev, [nivel]: !prev[nivel] }));
-    if (!loadedLevels[nivel]) {
-      loadLevel(nivel); // Cargar el nivel si no está cargado
-    }
+    setOpenAcordeon(prev => ({ ...prev, [nivel]: !prev[nivel] }));
   };
 
-  // Función para calcular la completitud de un nivel
-  const calcularCompletitud = (nivel, cantidadActual) => {
-    const cantidadEsperada = Math.pow(3, nivel);
-    return cantidadActual === cantidadEsperada;
-  };
+  const renderAcordeon = (nivel) => {
+    if (nivel > 12) return null;
 
-  // Función para renderizar un acordeón
-  const renderAcordeon = (data, nivel) => {
-    if (nivel > 12 || !data.length) return null;
-
-    const completado = calcularCompletitud(nivel, data.length);
+    const data = nivelesCompletos[nivel] || [];
+    const completado = data.length === Math.pow(3, nivel);
     const cantidadEsperada = Math.pow(3, nivel);
 
     return (
-      <div className="mb-4" key={`nivel-${nivel}`}>
+      <div className="mb-3" key={`nivel-${nivel}`}>
         <div
-          className="bg-gray-800 p-4 rounded-lg flex justify-between items-center cursor-pointer transition-transform transform hover:scale-105"
+          className={`p-3 rounded-lg flex justify-between items-center cursor-pointer ${
+            completado ? 'bg-green-900 bg-opacity-30' : 'bg-gray-800'
+          } hover:bg-opacity-70 transition-all`}
           onClick={() => toggleAcordeon(nivel)}
         >
-          <div className="flex flex-col">
-            <h3 className="text-lg font-semibold">{`Nivel ${nivel}`}</h3>
-            <span className="text-sm text-gray-400">
-              {`${data.length} / ${cantidadEsperada} usuarios - ${completado ? 'Completado' : 'No Completado'}`}
-            </span>
+          <div className="flex items-center gap-3">
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
+              completado ? 'bg-green-500' : 'bg-gray-600'
+            }`}>
+              <span className="text-sm font-medium">{nivel}</span>
+            </div>
+            <div>
+              <h3 className="font-medium">Nivel {nivel}</h3>
+              <p className="text-xs text-gray-300">
+                {data.length} de {cantidadEsperada} usuarios
+              </p>
+            </div>
           </div>
-          {openAcordeon[nivel] ? <FaChevronUp /> : <FaChevronDown />}
+          <div className="flex items-center gap-2">
+            <span className={`text-xs px-2 py-1 rounded ${
+              completado ? 'bg-green-500 text-white' : 'bg-gray-600 text-gray-200'
+            }`}>
+              {completado ? 'Completo' : 'Pendiente'}
+            </span>
+            {openAcordeon[nivel] ? <FaChevronUp /> : <FaChevronDown />}
+          </div>
         </div>
+        
         {openAcordeon[nivel] && (
-          <div className="pl-4 mt-2">
-            <ul className="mt-2">
-              {data.map((usuario) => (
-                <li
-                  key={usuario._id}
-                  className="mb-2 flex items-center transition-colores hover:bg-gray-700 p-2 rounded-md"
+          <div className="mt-2 pl-10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {data.map((usuario, index) => (
+                <div 
+                  key={`${usuario._id}-${index}`}
+                  className="p-2 bg-gray-800 rounded flex items-center gap-2 hover:bg-gray-700"
                 >
-                  <User className="mr-2" />
-                  {usuario.nombre_usuario} {/* Cambiar a nombre_usuario */}
-                </li>
+                  <User className="h-4 w-4 text-gray-400" />
+                  <span className="truncate">{usuario.nombre_usuario || `Usuario ${index+1}`}</span>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         )}
       </div>
     );
   };
 
-  // Función para renderizar todos los niveles
-  const renderTodosLosNiveles = (data) => {
-    const niveles = [];
-    let currentNivelData = data;
-
-    for (let nivel = 1; nivel <= 12; nivel++) {
-      niveles.push(renderAcordeon(currentNivelData, nivel));
-      currentNivelData = loadedLevels[nivel] || currentNivelData.flatMap((usuario) => usuario.hijos || []);
-    }
-
-    return niveles;
+  const renderTodosLosNiveles = () => {
+    return Array.from({ length: 12 }, (_, i) => i + 1).map(nivel => renderAcordeon(nivel));
   };
 
-  // Preloader mientras se cargan los datos
-  const Preloader = () => (
-    <div className="flex justify-center items-center h-screen">
-      <div className="loader">Cargando...</div>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4">Cargando tu red...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col text-white">
       <Background />
-      {loading ? (
-        <Preloader />
-      ) : (
-        <div className="max-w-7xl mx-auto px-4 py-16 flex-grow bg-opacity-65 bg-gray-800 rounded-2xl shadow-lg">
-          <h1 className="text-4xl font-bold mb-4">Red de Usuarios</h1>
-          <hr className="mb-6" />
-          <div className="mt-6 bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center">
-            <div>
-              <h2 className="text-xl font-semibold">Nivel alcanzado</h2>
-              <p className="text-gray-400">{nivelesCompletados}</p>
+      <div className="max-w-6xl mx-auto px-4 py-12 flex-grow">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Mi Red</h1>
+          <div className="flex items-center gap-4 text-gray-300">
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              <span>{username}</span>
             </div>
-          </div>
-          <div className="mt-4 bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center">
-            <div>
-              <h2 className="text-xl font-semibold">Nivel Máximo</h2>
-              <p className="text-gray-400">12</p>
-            </div>
-          </div>
-          <div className="mt-4 bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md">
-            <h2 className="text-2xl font-semibold mb-4">Red de Usuarios</h2>
-            {renderTodosLosNiveles(piramideData)}
+            <span className="text-sm bg-gray-700 px-2 py-1 rounded">
+              Nivel actual: {nivelesCompletados}
+            </span>
           </div>
         </div>
-      )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
+            <h3 className="text-gray-400 text-sm">Nivel alcanzado</h3>
+            <p className="text-2xl font-bold">{nivelesCompletados}</p>
+          </div>
+          <div className="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
+            <h3 className="text-gray-400 text-sm">Nivel máximo</h3>
+            <p className="text-2xl font-bold">12</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <h2 className="text-xl font-semibold mb-3">Estructura de la red</h2>
+          {renderTodosLosNiveles()}
+        </div>
+      </div>
+      <br /><br />
       <MobileNav />
     </div>
   );
