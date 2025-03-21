@@ -4,7 +4,6 @@ import { MobileNav } from '../components/MobileNav';
 import { FaDollarSign, FaCode, FaHistory } from 'react-icons/fa';
 import { NivelAlcanzadoComponent } from '../components/NIvelAlcanzado';
 
-
 export const Dashboard = () => {
   const [comisiones, setComisiones] = useState(0);
   const [codigosCreados, setCodigosCreados] = useState(0);
