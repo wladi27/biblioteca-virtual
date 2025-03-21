@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { User } from 'lucide-react';
 
 export const NivelAlcanzadoComisiones = () => {
   const [username, setUsername] = useState('');
@@ -18,9 +19,9 @@ export const NivelAlcanzadoComisiones = () => {
       const userData = JSON.parse(usuario);
       setUsername(userData.nombre_completo);
       setNivelUsuario(userData.nivel || 0);
-      setUserId(userData._id); // Guardar el ID de usuario
+      setUserId(userData._id);
       calcularNivelesCompletados(userData._id);
-      fetchRetiros(userData._id); // Obtener retiros del usuario
+      fetchRetiros(userData._id);
     }
   }, []);
 
@@ -63,21 +64,30 @@ export const NivelAlcanzadoComisiones = () => {
         const data = await response.json();
         const hijos = data.hijos || [];
         let nivelesCompletados = 0;
-        let currentNivelData = hijos;
+        let currentData = hijos;
+        let nextLevelData = currentData.flatMap(usuario => usuario.hijos || []);
 
         for (let nivel = 1; nivel <= 12; nivel++) {
           const cantidadEsperada = Math.pow(3, nivel);
-          if (currentNivelData.length === cantidadEsperada) {
+          
+          if (currentData.length < cantidadEsperada && nextLevelData.length > 0) {
+            const usuariosFaltantes = cantidadEsperada - currentData.length;
+            const usuariosParaTomar = Math.min(usuariosFaltantes, nextLevelData.length);
+            currentData = [...currentData, ...nextLevelData.slice(0, usuariosParaTomar)];
+            nextLevelData = nextLevelData.slice(usuariosParaTomar);
+          }
+
+          if (currentData.length >= cantidadEsperada) {
             nivelesCompletados++;
           } else {
             break;
           }
-          currentNivelData = currentNivelData.flatMap(usuario => usuario.hijos || []);
+
+          currentData = currentData.flatMap(usuario => usuario.hijos || []);
+          nextLevelData = currentData.flatMap(usuario => usuario.hijos || []);
         }
 
         setNivelesCompletados(nivelesCompletados);
-      } else {
-        console.error('Error al obtener la data de la pirámide');
       }
     } catch (error) {
       console.error('Error:', error);
@@ -102,10 +112,8 @@ export const NivelAlcanzadoComisiones = () => {
         const nuevoRetiro = await response.json();
         setRetiros([...retiros, nuevoRetiro]);
         setMensajeRetiro('Retiro registrado exitosamente');
-        setTimeout(() => setMensajeRetiro(''), 3000); // Limpiar mensaje después de 3 segundos
-        fetchRetiros(userId); // Actualizar la lista de retiros
-      } else {
-        console.error('Error al registrar el retiro');
+        setTimeout(() => setMensajeRetiro(''), 3000);
+        fetchRetiros(userId);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -121,80 +129,118 @@ export const NivelAlcanzadoComisiones = () => {
 
     const comision = comisionesData.find(c => c.numero_nivel === nivel);
     const montoComision = comision ? Number(comision.comision.$numberDecimal) : 0;
+    const completado = nivel <= nivelesCompletados;
 
     return (
-      <div className="mb-4" key={`nivel-${nivel}`}>
-  <div
-    className="bg-gray-800 p-2 rounded-lg flex justify-between items-center cursor-pointer"
-    onClick={() => toggleAcordeon(nivel)}
-  >
-    <h3 className="text-lg font-semibold">{`Nivel ${nivel}`}</h3>
-    <span className="text-sm text-green-500 mx-4">
-      {comision ? `Comisión: COP ${montoComision}` : 'No disponible'}
-    </span>
-    {openAcordeon[nivel] ? <FaChevronUp /> : <FaChevronDown />}
-  </div>
-  {openAcordeon[nivel] && (
-    <div className="bg-gray-900 p-4 rounded-lg mt-2">
-      <p className="text-gray-400">
-        Comisión: COP <span>{montoComision}</span>
-      </p>
-      {/* Mueve el botón de retirar aquí */}
-      <div className="flex justify-between">
-        {!isRetiroExistente(montoComision) ? (
-          <button
-            className="bg-blue-500 text-white py-1 px-3 rounded mt-2"
-            onClick={() => handleRetirar(montoComision)}
-          >
-            Retirar
-          </button>
-        ) : (
-          <span className="text-red-500 mx-4">Retiro ya registrado</span>
+      <div className="mb-3" key={`nivel-${nivel}`}>
+        <div
+          className={`p-3 rounded-lg flex justify-between items-center cursor-pointer ${
+            completado ? 'bg-green-900 bg-opacity-30' : 'bg-gray-800'
+          } hover:bg-opacity-70 transition-all`}
+          onClick={() => toggleAcordeon(nivel)}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
+              completado ? 'bg-green-500' : 'bg-gray-600'
+            }`}>
+              <span className="text-sm font-medium">{nivel}</span>
+            </div>
+            <div>
+              <h3 className="font-medium">Nivel {nivel}</h3>
+              <p className="text-xs text-gray-300">
+                {comision ? `COP ${montoComision}` : 'Sin comisión'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs px-2 py-1 rounded ${
+              completado ? 'bg-green-500 text-white' : 'bg-gray-600 text-gray-200'
+            }`}>
+              {completado ? 'Completo' : 'Pendiente'}
+            </span>
+            {openAcordeon[nivel] ? <FaChevronUp /> : <FaChevronDown />}
+          </div>
+        </div>
+        
+        {openAcordeon[nivel] && completado && (
+          <div className="mt-2 pl-10">
+            <div className="bg-gray-800 p-4 rounded-lg">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-medium">Comisión disponible:</span>
+                <span className="text-green-400">COP {montoComision}</span>
+              </div>
+              {!isRetiroExistente(montoComision) ? (
+                <button
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition-colors"
+                  onClick={() => handleRetirar(montoComision)}
+                >
+                  Retirar Comisión
+                </button>
+              ) : (
+                <div className="text-center py-2 text-yellow-400">
+                  Retiro ya registrado para este nivel
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
-    </div>
-  )}
-</div>
-
     );
   };
 
   const renderTodosLosNiveles = () => {
-    const niveles = [];
-    for (let nivel = 1; nivel <= 12; nivel++) {
-      niveles.push(renderAcordeon(nivel));
-    }
-    return niveles;
+    return Array.from({ length: 12 }, (_, i) => i + 1).map(nivel => renderAcordeon(nivel));
   };
 
-  return (
-    <div>
-      <div className="mt-6 bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center">
-        <div>
-          <h2 className="text-xl font-semibold">Nivel alcanzado</h2>
-          <p className="text-gray-400">{nivelesCompletados}</p>
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4">Cargando datos de comisiones...</p>
         </div>
       </div>
-      <div className="mt-4 bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center">           
-        <div>
-          <h2 className="text-xl font-semibold">Nivel Máximo</h2>
-          <p className="text-gray-400">12</p>
-        </div>
-        <br />
-      </div>
-      {mensajeRetiro && (
-        <div className="mt-4 p-2 bg-green-500 text-white rounded">
-          {mensajeRetiro}
-        </div>
-      )}
+    );
+  }
 
-      {loading ? (
-        <p className="text-gray-400">Cargando...</p>
-      ) : (
-        <div className="mt-4">
+  return (
+    <div className="min-h-screen flex flex-col text-white">
+      <div className="max-w-6xl mx-auto px-4 py-12 flex-grow">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Mis Comisiones por Nivel</h1>
+          <div className="flex items-center gap-4 text-gray-300">
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              <span>{username}</span>
+            </div>
+            <span className="text-sm bg-gray-700 px-2 py-1 rounded">
+              Nivel actual: {nivelUsuario}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
+            <h3 className="text-gray-400 text-sm">Niveles completados</h3>
+            <p className="text-2xl font-bold">{nivelesCompletados}</p>
+          </div>
+          <div className="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
+            <h3 className="text-gray-400 text-sm">Nivel máximo</h3>
+            <p className="text-2xl font-bold">12</p>
+          </div>
+        </div>
+
+        {mensajeRetiro && (
+          <div className="mb-4 p-3 bg-green-600 text-white rounded-lg">
+            {mensajeRetiro}
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <h2 className="text-xl font-semibold mb-3">Comisiones por Nivel</h2>
           {renderTodosLosNiveles()}
         </div>
-      )}
+      </div>
     </div>
   );
 };
