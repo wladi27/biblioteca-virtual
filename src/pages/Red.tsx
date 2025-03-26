@@ -3,6 +3,7 @@ import { Background } from '../components/Background';
 import { MobileNav } from '../components/MobileNav';
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { User } from 'lucide-react';
+import { NivelAlcanzadoComponent } from '../components/NIvelAlcanzado';
 
 export const Red = () => {
   const [username, setUsername] = useState('');
@@ -167,17 +168,11 @@ export const Red = () => {
               <User className="h-5 w-5" />
               <span>{username}</span>
             </div>
-            <span className="text-sm bg-gray-700 px-2 py-1 rounded">
-              Nivel actual: {nivelesCompletados}
-            </span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
-            <h3 className="text-gray-400 text-sm">Nivel alcanzado</h3>
-            <p className="text-2xl font-bold">{nivelesCompletados}</p>
-          </div>
+          <NivelAlcanzadoComponent />
           <div className="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
             <h3 className="text-gray-400 text-sm">Nivel máximo</h3>
             <p className="text-2xl font-bold">12</p>
