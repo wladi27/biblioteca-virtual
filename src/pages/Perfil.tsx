@@ -3,29 +3,27 @@ import { useNavigate } from 'react-router-dom';
 import { Background } from '../components/Background';
 import { MobileNav } from '../components/MobileNav';
 import { FaUserEdit, FaCode, FaSignOutAlt } from 'react-icons/fa';
-import { Trash2, Clipboard, CheckCircle } from 'lucide-react';
+import { Trash2, Clipboard, CheckCircle, Lock, User, Mail, Phone, CreditCard } from 'lucide-react';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 
 export const Perfil = () => {
-  const [username, setUsername] = useState('');
   const [userData, setUserData] = useState({});
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showCodesModal, setShowCodesModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [updateMessage, setUpdateMessage] = useState('');
   const [codes, setCodes] = useState([]);
-  const [copyMessage, setCopyMessage] = useState('');
-  const [isCopied, setIsCopied] = useState(false);
+  const [isCopied, setIsCopied] = useState({ id: null, status: false });
   const [aporteVerificado, setAporteVerificado] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const navigate = useNavigate();
   const [successMessage, setSuccessMessage] = useState('');
+  const [notification, setNotification] = useState({ message: '', type: '' });
 
   useEffect(() => {
     const usuario = localStorage.getItem('usuario');
     if (usuario) {
       const userData = JSON.parse(usuario);
-      setUsername(userData.nombre_completo);
       setUserData(userData);
       checkAporte(userData._id);
     }
@@ -38,8 +36,6 @@ export const Perfil = () => {
         const data = await response.json();
         const existeAporte = data.some(aporte => aporte.usuarioId === userId && aporte.aporte === true);
         setAporteVerificado(existeAporte);
-      } else {
-        console.error('Error al verificar el aporte');
       }
     } catch (error) {
       console.error('Error:', error);
@@ -56,8 +52,6 @@ export const Perfil = () => {
           const data = await response.json();
           setCodes(data);
           setShowCodesModal(true);
-        } else {
-          console.error('Error al obtener los códigos');
         }
       } catch (error) {
         console.error('Error:', error);
@@ -78,11 +72,11 @@ export const Perfil = () => {
         if (response.ok) {
           const newCode = await response.json();
           setCodes([...codes, newCode]);
-        } else {
-          console.error('Error al crear el código');
+          showNotification('Código creado exitosamente', 'success');
         }
       } catch (error) {
         console.error('Error:', error);
+        showNotification('Error al crear código', 'error');
       }
     }
   };
@@ -94,11 +88,11 @@ export const Perfil = () => {
       });
       if (response.ok) {
         setCodes(codes.filter(code => code._id !== codeId));
-      } else {
-        console.error('Error al eliminar el código');
+        showNotification('Código eliminado', 'success');
       }
     } catch (error) {
       console.error('Error:', error);
+      showNotification('Error al eliminar código', 'error');
     }
   };
 
@@ -108,16 +102,17 @@ export const Perfil = () => {
     navigate('/login');
   };
 
-  const handleCopyToClipboard = (code) => {
-    navigator.clipboard.writeText(code).then(() => {
-      setCopyMessage('Código copiado al portapapeles');
-      setIsCopied(true);
+  const handleCopyToClipboard = (text, id = null) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setIsCopied({ id, status: true });
+      showNotification('Copiado al portapapeles', 'success');
+      
       setTimeout(() => {
-        setCopyMessage('');
-        setIsCopied(false);
+        setIsCopied({ id: null, status: false });
       }, 2000);
     }).catch((error) => {
-      console.error('Error al copiar el código:', error);
+      console.error('Error al copiar:', error);
+      showNotification('Error al copiar', 'error');
     });
   };
 
@@ -134,11 +129,14 @@ export const Perfil = () => {
         localStorage.setItem('usuario', JSON.stringify(updatedUser.usuario));
         setUserData(updatedUser.usuario);
         setUpdateMessage('Perfil actualizado exitosamente.');
+        showNotification('Perfil actualizado', 'success');
       } else {
         setUpdateMessage('Error al actualizar el perfil.');
+        showNotification('Error al actualizar perfil', 'error');
       }
     } catch (error) {
       setUpdateMessage('Error al actualizar el perfil.');
+      showNotification('Error al actualizar perfil', 'error');
     }
   };
 
@@ -150,177 +148,357 @@ export const Perfil = () => {
         body: JSON.stringify({ nuevaContraseña: newPassword }),
       });
       if (response.ok) {
-        setSuccessMessage('Contraseña actualizada exitosamente.'); // Establecer el mensaje de éxito
-        setShowChangePasswordModal(false); // Cerrar el modal
-
-        // Ocultar el mensaje después de 5 segundos
-        setTimeout(() => {
-          setSuccessMessage('');
-        }, 5000);
+        setSuccessMessage('Contraseña actualizada exitosamente.');
+        setShowChangePasswordModal(false);
+        showNotification('Contraseña actualizada', 'success');
+        setTimeout(() => setSuccessMessage(''), 5000);
       } else {
-        setUpdateMessage('Error al actualizar la contraseña.');
+        showNotification('Error al actualizar contraseña', 'error');
       }
     } catch (error) {
-      setUpdateMessage('Error al actualizar la contraseña.');
+      showNotification('Error al actualizar contraseña', 'error');
     }
   };
-  
+
+  const showNotification = (message, type) => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification({ message: '', type: '' }), 3000);
+  };
 
   return (
     <div className="min-h-screen flex flex-col text-white">
       <Background />
       
-      <MobileNav />
+      <div className="max-w-4xl mx-auto px-4 py-8 w-full">
+        {/* Notificaciones */}
+        {notification.message && (
+          <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in ${
+            notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+          }`}>
+            {notification.message}
+          </div>
+        )}
 
-      <div className="w-full max-w-7xl mx-auto px-4 py-16 flex-grow bg-opacity-65 bg-gray-800 rounded-2xl shadow-lg md:min-w-[600px]">
-        <h1 className="text-4xl font-bold mb-4">Perfil</h1>
-        <hr />
-
-        <div className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center justify-between">
+        {/* Encabezado */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
           <div>
-            <h2 className="text-xl font-semibold">ID de Usuario</h2>
-            <span className="text-gray-300">{userData._id}</span>
-            <p className={`text-lg ${aporteVerificado ? 'text-green-500' : 'text-red-500'}`}>
-              {aporteVerificado ? 'Verificado' : 'Sin Verificar'}
-            </p>
+            <h1 className="text-3xl font-bold">Mi Perfil</h1>
+            <p className="text-gray-400">Administra tu información personal</p>
           </div>
-          {isCopied ? (
-            <CheckCircle className="text-green-500" size={24} />
-          ) : (
-            <Clipboard
-              className="text-blue-500 hover:text-blue-400 transition-colors cursor-pointer"
-              size={24}
-              onClick={() => handleCopyToClipboard(userData._id)}
-            />
-          )}
-        </div>
-
-        {/* Mostrar mensaje de éxito */}
-      {successMessage && (
-        <div className="bg-green-500 text-white p-4 rounded-md fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
-          {successMessage}
-        </div>
-      )}
-
-        <div className="pt-6 flex flex-col items-center gap-8 mb-8">
-          <div className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center cursor-pointer w-full max-w-md" onClick={() => setShowUpdateModal(true)}>
-            <FaUserEdit className="text-3xl mr-4" />
-            <div>
-              <h2 className="text-xl font-semibold">Editar Perfil</h2>
-            </div>
-          </div>
-
-          <div className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center cursor-pointer w-full max-w-md" onClick={handleGenerateCode}>
-            <FaCode className="text-3xl mr-4" />
-            <div>
-              <h2 className="text-xl font-semibold">Código de Referido</h2>
-            </div>
-          </div>
-
-          <div className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center cursor-pointer w-full max-w-md" onClick={() => setShowChangePasswordModal(true)}>
-            <FaUserEdit className="text-3xl mr-4" />
-            <div>
-              <h2 className="text-xl font-semibold">Cambiar Contraseña</h2>
-            </div>
-          </div>
-
-          <div className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center cursor-pointer w-full max-w-md" onClick={() => setShowLogoutModal(true)}>
-            <FaSignOutAlt className="text-3xl mr-4" />
-            <div>
-              <h2 className="text-xl font-semibold">Cerrar Sesión</h2>
+          <div className="mt-4 sm:mt-0 flex items-center gap-2">
+            <div className={`px-3 py-1 rounded-full text-sm ${
+              aporteVerificado ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+            }`}>
+              {aporteVerificado ? 'Verificado' : 'Sin verificar'}
             </div>
           </div>
         </div>
 
-        {/* Modal para actualizar perfil */}
+        {/* Tarjeta de información */}
+        <div className="bg-gray-800/70 rounded-xl p-6 shadow-lg border border-gray-700 mb-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-6">
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold mb-4">Información Personal</h2>
+              
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-500/20 p-2 rounded-full">
+                    <User className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Nombre completo</p>
+                    <p className="font-medium">{userData.nombre_completo || 'No especificado'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="bg-purple-500/20 p-2 rounded-full">
+                    <Mail className="h-5 w-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Correo electrónico</p>
+                    <p className="font-medium">{userData.correo_electronico || 'No especificado'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="bg-green-500/20 p-2 rounded-full">
+                    <CreditCard className="h-5 w-5 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">ID de usuario</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-mono text-sm truncate max-w-[180px]">{userData._id}</p>
+                      <button 
+                        onClick={() => handleCopyToClipboard(userData._id, 'user-id')} 
+                        className="text-blue-400 hover:text-blue-300 transition-colors"
+                        aria-label="Copiar ID de usuario"
+                      >
+                        {isCopied.id === 'user-id' && isCopied.status ? (
+                          <CheckCircle className="h-4 w-4" />
+                        ) : (
+                          <Clipboard className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold mb-4">Información de Contacto</h2>
+              
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-yellow-500/20 p-2 rounded-full">
+                    <Phone className="h-5 w-5 text-yellow-400" />
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Línea de llamadas</p>
+                    <p className="font-medium">{userData.linea_llamadas || 'No especificado'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="bg-green-500/20 p-2 rounded-full">
+                    <Phone className="h-5 w-5 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">WhatsApp</p>
+                    <p className="font-medium">{userData.linea_whatsapp || 'No especificado'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="bg-red-500/20 p-2 rounded-full">
+                    <CreditCard className="h-5 w-5 text-red-400" />
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Documento</p>
+                    <p className="font-medium">{userData.dni || 'No especificado'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Acciones */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <button 
+            onClick={() => setShowUpdateModal(true)}
+            className="bg-gray-700 hover:bg-gray-600 p-4 rounded-xl flex items-center gap-3 transition-colors"
+          >
+            <div className="bg-blue-500/20 p-3 rounded-full">
+              <FaUserEdit className="h-5 w-5 text-blue-400" />
+            </div>
+            <span>Editar perfil</span>
+          </button>
+
+          <button 
+            onClick={handleGenerateCode}
+            className="bg-gray-700 hover:bg-gray-600 p-4 rounded-xl flex items-center gap-3 transition-colors"
+          >
+            <div className="bg-purple-500/20 p-3 rounded-full">
+              <FaCode className="h-5 w-5 text-purple-400" />
+            </div>
+            <span>Códigos de referido</span>
+          </button>
+
+          <button 
+            onClick={() => setShowChangePasswordModal(true)}
+            className="bg-gray-700 hover:bg-gray-600 p-4 rounded-xl flex items-center gap-3 transition-colors"
+          >
+            <div className="bg-green-500/20 p-3 rounded-full">
+              <Lock className="h-5 w-5 text-green-400" />
+            </div>
+            <span>Cambiar contraseña</span>
+          </button>
+        </div>
+
+        <button 
+          onClick={() => setShowLogoutModal(true)}
+          className="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 p-4 rounded-xl flex items-center justify-center gap-3 transition-colors"
+        >
+          <FaSignOutAlt className="h-5 w-5" />
+          <span>Cerrar sesión</span>
+        </button>
+
+        {/* Modal de edición de perfil */}
         {showUpdateModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="bg-gray-800 p-4 rounded-lg shadow-lg text-center max-h-[80vh] overflow-y-auto">
-              <h2 className="text-xl font-semibold mb-4">Actualizar Perfil</h2>
-              {updateMessage && <div className="mb-4 text-green-400">{updateMessage}</div>}
-              <form onSubmit={handleUpdateProfile} className="flex flex-col items-center">
-                <label className="text-left w-full mb-1" htmlFor="nombreCompleto">Nombre Completo</label>
-                <input
-                  id="nombreCompleto"
-                  type="text"
-                  placeholder="Nombre Completo"
-                  value={userData.nombre_completo || ''}
-                  onChange={(e) => setUserData({ ...userData, nombre_completo: e.target.value })}
-                  className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                  required
-                />
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+            <div className="bg-gray-800 rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <h2 className="text-2xl font-bold mb-4">Editar perfil</h2>
+                
+                {updateMessage && (
+                  <div className={`mb-4 p-3 rounded-lg ${
+                    updateMessage.includes('éxito') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                  }`}>
+                    {updateMessage}
+                  </div>
+                )}
 
-                <label className="text-left w-full mb-1" htmlFor="correoElectronico">Correo Electrónico</label>
-                <input
-                  id="correoElectronico"
-                  type="email"
-                  placeholder="Correo Electrónico"
-                  value={userData.correo_electronico || ''}
-                  onChange={(e) => setUserData({ ...userData, correo_electronico: e.target.value })}
-                  className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                  required
-                />
+                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                  <div>
+                    <label className="block text-gray-400 mb-1">Nombre completo</label>
+                    <input
+                      type="text"
+                      value={userData.nombre_completo || ''}
+                      onChange={(e) => setUserData({ ...userData, nombre_completo: e.target.value })}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
 
-                <label className="text-left w-full mb-1" htmlFor="lineaLlamadas">Número de Línea de Llamadas</label>
-                <input
-                  id="lineaLlamadas"
-                  type="text"
-                  placeholder="Número de Línea de Llamadas"
-                  value={userData.linea_llamadas || ''}
-                  onChange={(e) => setUserData({ ...userData, linea_llamadas: e.target.value })}
-                  className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                />
+                  <div>
+                    <label className="block text-gray-400 mb-1">Correo electrónico</label>
+                    <input
+                      type="email"
+                      value={userData.correo_electronico || ''}
+                      onChange={(e) => setUserData({ ...userData, correo_electronico: e.target.value })}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
 
-                <label className="text-left w-full mb-1" htmlFor="lineaWhatsApp">Número de Línea de WhatsApp</label>
-                <input
-                  id="lineaWhatsApp"
-                  type="text"
-                  placeholder="Número de Línea de WhatsApp"
-                  value={userData.linea_whatsapp || ''}
-                  onChange={(e) => setUserData({ ...userData, linea_whatsapp: e.target.value })}
-                  className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                />
+                  <div>
+                    <label className="block text-gray-400 mb-1">Línea de llamadas</label>
+                    <input
+                      type="text"
+                      value={userData.linea_llamadas || ''}
+                      onChange={(e) => setUserData({ ...userData, linea_llamadas: e.target.value })}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
 
-                <label className="text-left w-full mb-1" htmlFor="dni">CC</label>
-                <input
-                  id="dni"
-                  type="text"
-                  placeholder="DNI"
-                  value={userData.dni || ''}
-                  onChange={(e) => setUserData({ ...userData, dni: e.target.value })}
-                  className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                  required
-                />
+                  <div>
+                    <label className="block text-gray-400 mb-1">WhatsApp</label>
+                    <input
+                      type="text"
+                      value={userData.linea_whatsapp || ''}
+                      onChange={(e) => setUserData({ ...userData, linea_whatsapp: e.target.value })}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
 
-                <label className="text-left w-full mb-1" htmlFor="nombreUsuario">Nombre de Usuario</label>
-                <input
-                  id="nombreUsuario"
-                  type="text"
-                  placeholder="Nombre de Usuario"
-                  value={userData.nombre_usuario || ''}
-                  onChange={(e) => setUserData({ ...userData, nombre_usuario: e.target.value })}
-                  className="mb-4 p-2 rounded-md bg-gray-700 text-white w-full"
-                  required
-                />
+                  <div>
+                    <label className="block text-gray-400 mb-1">Documento</label>
+                    <input
+                      type="text"
+                      value={userData.dni || ''}
+                      onChange={(e) => setUserData({ ...userData, dni: e.target.value })}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
 
-                <button
-                  type="submit"
-                  className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Actualizar
-                </button>
-              </form>
-              <button
-                className="mt-4 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
-                onClick={() => setShowUpdateModal(false)}
-              >
-                Cerrar
-              </button>
+                  <div>
+                    <label className="block text-gray-400 mb-1">Nombre de usuario</label>
+                    <input
+                      type="text"
+                      value={userData.nombre_usuario || ''}
+                      onChange={(e) => setUserData({ ...userData, nombre_usuario: e.target.value })}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowUpdateModal(false)}
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+                    >
+                      Guardar cambios
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Modal para cambiar contraseña */}
+        {/* Modal de códigos de referido */}
+        {showCodesModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+            <div className="bg-gray-800 rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold">Códigos de referido</h2>
+                  <button
+                    onClick={handleCreateCode}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <FaCode className="h-4 w-4" />
+                    <span>Nuevo código</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {codes.length > 0 ? (
+                    codes.map((code) => (
+                      <div key={code._id} className="bg-gray-700/50 p-4 rounded-lg flex justify-between items-center">
+                        <div>
+                          <p className="font-mono">{code.code}</p>
+                          <p className={`text-xs ${
+                            code.used ? 'text-red-400' : 'text-green-400'
+                          }`}>
+                            {code.used ? 'Usado' : 'Disponible'}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleCopyToClipboard(code.code, code._id)}
+                            className="p-2 bg-blue-600/20 hover:bg-blue-600/30 rounded-lg transition-colors"
+                            aria-label={`Copiar código ${code.code}`}
+                          >
+                            {isCopied.id === code._id && isCopied.status ? (
+                              <CheckCircle className="h-4 w-4 text-green-400" />
+                            ) : (
+                              <Clipboard className="h-4 w-4" />
+                            )}
+                          </button>
+                          {!code.used && (
+                            <button
+                              onClick={() => handleDeleteCode(code._id)}
+                              className="p-2 bg-red-600/20 hover:bg-red-600/30 rounded-lg transition-colors"
+                              aria-label="Eliminar código"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-400">
+                      No tienes códigos generados
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => setShowCodesModal(false)}
+                    className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg transition-colors"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de cambio de contraseña */}
         {showChangePasswordModal && (
           <ChangePasswordModal
             show={showChangePasswordModal}
@@ -329,79 +507,35 @@ export const Perfil = () => {
           />
         )}
 
-        {/* Modal para códigos referidos */}
-        {showCodesModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="bg-gray-800 p-4 rounded-lg shadow-lg text-center max-h-[80vh] overflow-y-auto">
-              <h2 className="text-2xl font-semibold mb-4">Códigos de Referido</h2>
-              <button
-                className="mb-4 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-                onClick={handleCreateCode}
-              >
-                Crear Código
-              </button>
-              <div className="flex flex-col gap-4">
-                {codes.length > 0 ? (
-                  codes.map((code) => (
-                    <div key={code._id} className="flex justify-between items-center bg-gray-700 p-4 rounded-md">
-                      <div className="flex flex-col items-start">
-                        <span className="text-gray-300">{code.code}</span>
-                        <span className="text-gray-400 text-sm">{code.used ? 'Usado' : 'No usado'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clipboard
-                          className="text-blue-500 hover:text-blue-400 transition-colors cursor-pointer"
-                          size={20}
-                          onClick={() => handleCopyToClipboard(code.code)}
-                        />
-                        {!code.used && (
-                          <Trash2
-                            className="text-red-500 hover:text-red-400 transition-colors cursor-pointer"
-                            size={20}
-                            onClick={() => handleDeleteCode(code._id)}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-gray-300">No tienes códigos generados.</div>
-                )}
-              </div>
-              {copyMessage && <div className="mt-2 text-green-400">{copyMessage}</div>}
-              <button
-                className="mt-4 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
-                onClick={() => setShowCodesModal(false)}
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Modal para cerrar sesión */}
+        {/* Modal de cierre de sesión */}
         {showLogoutModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="bg-gray-800 p-4 rounded-lg shadow-lg text-center">
-              <h2 className="text-xl font-semibold mb-4">¿Estás seguro de que deseas cerrar sesión?</h2>
-              <div className="flex justify-center gap-4">
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+            <div className="bg-gray-800 rounded-xl shadow-xl w-full max-w-md p-6">
+              <h2 className="text-2xl font-bold mb-4">Cerrar sesión</h2>
+              <p className="text-gray-400 mb-6">¿Estás seguro de que deseas salir de tu cuenta?</p>
+              
+              <div className="flex justify-end gap-3">
                 <button
-                  className="bg-red-600 text-white py-2 px-6 rounded-md hover:bg-red-700 transition-colors"
-                  onClick={handleLogout}
-                >
-                  Sí, cerrar sesión
-                </button>
-                <button
-                  className="bg-gray-600 text-white py-2 px-6 rounded-md hover:bg-gray-700 transition-colors"
                   onClick={() => setShowLogoutModal(false)}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg transition-colors"
                 >
                   Cancelar
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <FaSignOutAlt className="h-4 w-4" />
+                  <span>Cerrar sesión</span>
                 </button>
               </div>
             </div>
           </div>
         )}
       </div>
+      <br /><br /><br />
+
+      <MobileNav />
     </div>
   );
 };
