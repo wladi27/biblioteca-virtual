@@ -19,6 +19,7 @@ import { TotalReferralCodes } from './pages/TotalCodigos';
 import { TotalWithdrawals } from './pages/TotalRetiros';
 import { TotalApprovedContributions } from './pages/TotalAportes';
 import { CrudComisiones } from './pages/CrudComisiones';
+import WalletApp from './pages/Billetera';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/billetera" element={<WalletApp />} />
         <Route path="/perfil" element={<Perfil/>} />
         <Route path="/red" element={<Red/>} />
         <Route path="/terminos-y-condiciones" element={<Terminos/>} />

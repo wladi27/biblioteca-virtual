@@ -9,9 +9,7 @@ export const NivelAlcanzadoComisiones = () => {
   const [comisionesData, setComisionesData] = useState([]);
   const [openAcordeon, setOpenAcordeon] = useState({});
   const [loading, setLoading] = useState(true);
-  const [retiros, setRetiros] = useState([]);
   const [userId, setUserId] = useState('');
-  const [mensajeRetiro, setMensajeRetiro] = useState('');
 
   useEffect(() => {
     const usuario = localStorage.getItem('usuario');
@@ -21,7 +19,6 @@ export const NivelAlcanzadoComisiones = () => {
       setNivelUsuario(userData.nivel || 0);
       setUserId(userData._id);
       calcularNivelesCompletados(userData._id);
-      fetchRetiros(userData._id);
     }
   }, []);
 
@@ -42,20 +39,6 @@ export const NivelAlcanzadoComisiones = () => {
 
     fetchComisiones();
   }, []);
-
-  const fetchRetiros = async (userId) => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals/usuario/${userId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setRetiros(data);
-      } else {
-        console.error('Error al obtener los retiros');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  };
 
   const calcularNivelesCompletados = async (userId) => {
     try {
@@ -100,30 +83,6 @@ export const NivelAlcanzadoComisiones = () => {
     setOpenAcordeon((prev) => ({ ...prev, [nivel]: !prev[nivel] }));
   };
 
-  const handleRetirar = async (monto) => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuarioId: userId, monto }),
-      });
-
-      if (response.ok) {
-        const nuevoRetiro = await response.json();
-        setRetiros([...retiros, nuevoRetiro]);
-        setMensajeRetiro('Retiro registrado exitosamente');
-        setTimeout(() => setMensajeRetiro(''), 3000);
-        fetchRetiros(userId);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  };
-
-  const isRetiroExistente = (monto) => {
-    return retiros.some(retiro => retiro.monto === monto);
-  };
-
   const renderAcordeon = (nivel) => {
     if (nivel > nivelesCompletados || nivel > 12) return null;
 
@@ -166,21 +125,10 @@ export const NivelAlcanzadoComisiones = () => {
           <div className="mt-2 pl-10">
             <div className="bg-gray-800 p-4 rounded-lg">
               <div className="flex justify-between items-center mb-2">
-                <span className="font-medium">Comisión disponible:</span>
+                <span className="font-medium">Comisión Obtenida:</span>
                 <span className="text-green-400">COP {montoComision}</span>
               </div>
-              {!isRetiroExistente(montoComision) ? (
-                <button
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition-colors"
-                  onClick={() => handleRetirar(montoComision)}
-                >
-                  Retirar Comisión
-                </button>
-              ) : (
-                <div className="text-center py-2 text-yellow-400">
-                  Retiro ya registrado para este nivel
-                </div>
-              )}
+              
             </div>
           </div>
         )}
@@ -229,12 +177,6 @@ export const NivelAlcanzadoComisiones = () => {
             <p className="text-2xl font-bold">12</p>
           </div>
         </div>
-
-        {mensajeRetiro && (
-          <div className="mb-4 p-3 bg-green-600 text-white rounded-lg">
-            {mensajeRetiro}
-          </div>
-        )}
 
         <div className="space-y-3">
           <h2 className="text-xl font-semibold mb-3">Comisiones por Nivel</h2>

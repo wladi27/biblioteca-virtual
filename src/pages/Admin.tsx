@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Background } from '../components/Background';
-import { FaHistory, FaUsers, FaCode, FaClipboard } from 'react-icons/fa';
+import { FaHistory, FaUsers, FaCode, FaClipboard, FaDollarSign } from 'react-icons/fa';
 import { AdminNav } from '../components/AdminNav';
 import { Link } from 'react-router-dom';
 
@@ -9,11 +9,11 @@ export const Admin = () => {
   const [totalCodigosCreados, setTotalCodigosCreados] = useState(0);
   const [totalRetiros, setTotalRetiros] = useState(0);
   const [totalAportesValidados, setTotalAportesValidados] = useState(0);
-  const [listaRetiros, setListaRetiros] = useState([]);
+  const [transacciones, setTransacciones] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [retiroSeleccionado, setRetiroSeleccionado] = useState(null);
+  const [transaccionSeleccionada, setTransaccionSeleccionada] = useState(null);
   const [usuariosReferidos, setUsuariosReferidos] = useState([]);
   const [todosLosUsuarios, setTodosLosUsuarios] = useState([]);
   const [aportes, setAportes] = useState([]);
@@ -24,10 +24,10 @@ export const Admin = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [usuariosResponse, codigosResponse, retirosResponse, aportesResponse] = await Promise.all([
+        const [usuariosResponse, codigosResponse, transaccionesResponse, aportesResponse] = await Promise.all([
           fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios`),
           fetch(`${import.meta.env.VITE_URL_LOCAL}/api/referralCodes`),
-          fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals`),
+          fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/`),
           fetch(`${import.meta.env.VITE_URL_LOCAL}/api/aportes`)
         ]);
 
@@ -40,10 +40,11 @@ export const Admin = () => {
         const codigosData = await codigosResponse.json();
         setTotalCodigosCreados(codigosData.length);
 
-        if (!retirosResponse.ok) throw new Error('Error al cargar retiros');
-        const retirosData = await retirosResponse.json();
-        setTotalRetiros(retirosData.length);
-        setListaRetiros(retirosData);
+        if (!transaccionesResponse.ok) throw new Error('Error al cargar transacciones');
+        const transaccionesData = await transaccionesResponse.json();
+        const retiros = transaccionesData.filter(t => t.tipo === 'retiro');
+        setTotalRetiros(retiros.length);
+        setTransacciones(retiros);
 
         if (!aportesResponse.ok) throw new Error('Error al cargar aportes');
         const aportesData = await aportesResponse.json();
@@ -60,23 +61,23 @@ export const Admin = () => {
     fetchData();
   }, []);
 
-  const obtenerDatosUsuario = useCallback(async (usuarioId, retiroId) => {
+  const obtenerDatosUsuario = useCallback(async (usuarioId, transaccionId) => {
     try {
       const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${usuarioId}`);
       if (!response.ok) throw new Error('Error al obtener los datos del usuario');
       const usuarioData = await response.json();
       setUsuarioSeleccionado(usuarioData);
       
-      // Obtener el retiro completo y establecerlo
-      const retiroData = listaRetiros.find(retiro => retiro._id === retiroId);
-      setRetiroSeleccionado(retiroData);
+      // Obtener la transacción completa y establecerla
+      const transaccionData = transacciones.find(t => t._id === transaccionId);
+      setTransaccionSeleccionada(transaccionData);
       
       await obtenerReferidos(usuarioId);
       setModalVisible(true);
     } catch (error) {
       setError(error.message);
     }
-  }, [listaRetiros]);
+  }, [transacciones]);
 
   const obtenerReferidos = async (usuarioId) => {
     try {
@@ -94,7 +95,7 @@ export const Admin = () => {
           const aporte = aportes.find(aporte => aporte.usuarioId === usuario._id);
           return {
             id: usuario._id,
-            nombre: usuario.nombre_usuario,
+            nombre: usuario.nombre_completo, // Asegúrate de que este campo existe
             validado: aporte ? aporte.aporte : false
           };
         });
@@ -108,18 +109,22 @@ export const Admin = () => {
     }
   };
 
-  const filtrarRetiros = () => {
-    if (!busqueda) return listaRetiros;
-    return listaRetiros.filter(retiro => 
-      retiro.usuarioId._id.toLowerCase().includes(busqueda.toLowerCase()) || 
-      retiro.usuarioId.nombre_completo.toLowerCase().includes(busqueda.toLowerCase())
-    );
+  const filtrarTransacciones = () => {
+    if (!busqueda) return transacciones;
+    return transacciones.filter(transaccion => {
+      const usuario = todosLosUsuarios.find(u => u._id === transaccion.usuario_id);
+      if (!usuario) return false;
+      return (
+        transaccion.usuario_id.toLowerCase().includes(busqueda.toLowerCase()) || 
+        usuario.nombre_completo.toLowerCase().includes(busqueda.toLowerCase())
+      );
+    });
   };
 
   const cerrarModal = () => {
     setModalVisible(false);
     setUsuarioSeleccionado(null);
-    setRetiroSeleccionado(null);
+    setTransaccionSeleccionada(null);
     setUsuariosReferidos([]);
   };
 
@@ -129,200 +134,240 @@ export const Admin = () => {
       .catch(err => console.error('Error al copiar:', err));
   };
 
-  const cambiarEstadoRetiro = async (nuevoEstado) => {
-    if (!retiroSeleccionado) return;
-
-    try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals/${retiroSeleccionado._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: nuevoEstado })
-      });
-
-      if (!response.ok) throw new Error('Error al cambiar el estado del retiro');
-
-      const retirosResponse = await fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals`);
-      const retirosData = await retirosResponse.json();
-      setListaRetiros(retirosData);
-      cerrarModal();
-    } catch (error) {
-      setError(error.message);
-    }
-  };
-
-  const eliminarRetiro = async () => {
-    if (!retiroSeleccionado) return;
-
-    try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals/${retiroSeleccionado._id}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) throw new Error('Error al eliminar el retiro');
-
-      const retirosResponse = await fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals`);
-      const retirosData = await retirosResponse.json();
-      setListaRetiros(retirosData);
-      cerrarModal();
-    } catch (error) {
-      setError(error.message);
-    }
-  };
-
   return (
     <div className="min-h-screen flex flex-col text-white">
       <Background />
       
-      <div className="max-w-7xl px-4 py-16 flex-grow bg-opacity-65 bg-gray-800 rounded-2xl shadow-lg">
-        <h1 className="text-4xl font-bold mb-4">Administración</h1>
-        <hr />
+      {/* Contenedor principal */}
+      <div className="max-w-7xl mx-auto px-4 py-8 sm:py-12 w-full">
+        {/* Tarjeta principal con fondo semitransparente */}
+        <div className="bg-gray-800 bg-opacity-80 rounded-2xl shadow-xl overflow-hidden">
+          {/* Encabezado con gradiente */}
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
+            <h1 className="text-3xl font-bold text-center">Administración</h1>
+          </div>
 
-        {loading && <p>Cargando datos...</p>}
-        {error && <p className="text-red-500">{error}</p>}
-
-        <div className="pt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
-          <Link to="/BV/usuarios" className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center">
-            <FaUsers className="text-3xl mr-4" />
-            <div>
-              <h2 className="text-xl font-semibold">Total de Usuarios</h2>
-              <p className="text-gray-400">{totalUsuarios}</p>
-            </div>
-          </Link>
-
-          <Link to="/BV/codes" className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center">
-            <FaCode className="text-3xl mr-4" />
-            <div>
-              <h2 className="text-xl font-semibold">Total de Códigos Creados</h2>
-              <p className="text-gray-400">{totalCodigosCreados}</p>
-            </div>
-          </Link>
-
-          <Link to="/BV/aportes" className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center">
-            <FaClipboard className="text-3xl mr-4" />
-            <div>
-              <h2 className="text-xl font-semibold">Total de Aportes Validados</h2>
-              <p className="text-gray-400">{totalAportesValidados}</p>
-            </div>
-          </Link>
-        </div>
-
-        <div className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md">
-          <h2 className="text-2xl font-semibold mb-4 flex items-center">
-            <FaHistory className="mr-2" /> Lista de Retiros
-          </h2>
-          <input
-            type="text"
-            placeholder="Buscar por ID o Nombre"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            className="mb-4 p-2 rounded bg-gray-600 text-white w-full"
-          />
-          <ul className="space-y-4">
-            {filtrarRetiros().map((retiro) => (
-              <li key={retiro._id} className="bg-gray-600 p-4 rounded-lg flex justify-between items-center">
-                <div className="flex-grow">
-                  <p className="font-semibold">ID Usuario: {retiro.usuarioId._id}</p>
-                  <p className="font-semibold">Nombre: {retiro.usuarioId.nombre_completo}</p>
-                  <p className="font-semibold">Monto: ${retiro.monto}</p>
-                  <p className="text-gray-400">Estado: {retiro.status}</p>
-                  <p className="text-gray-400">Fecha: {new Date(retiro.fecha).toLocaleDateString()}</p>
+          {/* Contenido principal */}
+          <div className="p-6">
+            {/* Sección de estadísticas */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {/* Tarjeta de usuarios */}
+              <Link to="/BV/usuarios" className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border-l-4 border-blue-400 transition-all hover:shadow-lg">
+                <div className="flex items-center">
+                  <div className="p-3 bg-blue-500 rounded-full mr-4">
+                    <FaUsers className="text-xl" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Total Usuarios</h2>
+                    <p className="text-2xl font-bold">{totalUsuarios}</p>
+                  </div>
                 </div>
-                <button 
-                  onClick={() => obtenerDatosUsuario(retiro.usuarioId._id, retiro._id)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-200 ease-in-out"
-                >
-                  Ver
-                </button>
-              </li>
-            ))}
-          </ul>
+              </Link>
+              
+              {/* Tarjeta de códigos creados */}
+              <Link to="/BV/codes" className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border-l-4 border-green-400 transition-all hover:shadow-lg">
+                <div className="flex items-center">
+                  <div className="p-3 bg-green-500 rounded-full mr-4">
+                    <FaCode className="text-xl" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Códigos Creados</h2>
+                    <p className="text-2xl font-bold">{totalCodigosCreados}</p>
+                  </div>
+                </div>
+              </Link>
+
+              {/* Tarjeta de retiros */}
+              <div className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border-l-4 border-purple-400 transition-all hover:shadow-lg">
+                <div className="flex items-center">
+                  <div className="p-3 bg-purple-500 rounded-full mr-4">
+                    <FaDollarSign className="text-xl" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Total Retiros</h2>
+                    <p className="text-2xl font-bold">{totalRetiros}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tarjeta de aportes */}
+              <Link to="/BV/aportes" className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border-l-4 border-yellow-400 transition-all hover:shadow-lg">
+                <div className="flex items-center">
+                  <div className="p-3 bg-yellow-500 rounded-full mr-4">
+                    <FaClipboard className="text-xl" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Aportes Validados</h2>
+                    <p className="text-2xl font-bold">{totalAportesValidados}</p>
+                  </div>
+                </div>
+              </Link>
+            </div>
+
+            {/* Sección de retiros */}
+            <div className="bg-gray-700 bg-opacity-50 p-6 rounded-xl">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <FaHistory className="mr-2" /> Historial de Retiros
+              </h2>
+              
+              <input
+                type="text"
+                placeholder="Buscar por ID o Nombre"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                className="mb-4 p-2 rounded bg-gray-600 text-white w-full"
+              />
+              
+              {loading ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-400">Cargando datos...</p>
+                </div>
+              ) : error ? (
+                <div className="text-center py-8">
+                  <p className="text-red-500">{error}</p>
+                </div>
+              ) : transacciones.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-400">No hay retiros registrados</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-600">
+                    <thead>
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">ID Usuario</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Nombre</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Monto</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Descripción</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Fecha</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-gray-800 divide-y divide-gray-600">
+                      {filtrarTransacciones().map((transaccion) => {
+                        const usuario = todosLosUsuarios.find(u => u._id === transaccion.usuario_id);
+                        return (
+                          <tr key={transaccion._id} className="hover:bg-gray-700 transition-colors">
+                            <td className="px-4 py-3 whitespace-nowrap text-gray-300">{transaccion.usuario_id}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-gray-300">
+                              {usuario ? usuario.nombre_completo : 'Usuario no encontrado'}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-gray-300">${transaccion.monto}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-gray-300">{transaccion.descripcion}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-gray-300">
+                              {new Date(transaccion.fecha).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {usuario && (
+                                <button
+                                  onClick={() => obtenerDatosUsuario(transaccion.usuario_id, transaccion._id)}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded text-sm transition-colors"
+                                >
+                                  Ver
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
+      {/* Modal para detalles del usuario */}
       {modalVisible && usuarioSeleccionado && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 overflow-y-auto">
-          <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-4">Detalles del Usuario</h2>
-            {['nombre_completo', 'dni', 'linea_llamadas', 'linea_whatsapp', 'banco', 'cuenta_numero', 'titular_cuenta', 'correo_electronico'].map((field, index) => (
-              <div key={index} className="mb-2 flex justify-between items-center">
-                <span><strong>{field === 'dni' ? 'CC' : field.replace('_', ' ').toUpperCase()}:</strong> {usuarioSeleccionado[field]}</span>
-                <FaClipboard 
-                  className="cursor-pointer text-green-500"
-                  onClick={() => copiarAlPortapapeles(usuarioSeleccionado[field])}
-                />
-              </div>
-            ))}
-            <hr />
-            <h3 className="text-xl font-semibold mt-4">Usuarios Referidos</h3>
-            {usuariosReferidos.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4 mt-2">
-                {usuariosReferidos.map(({ id, nombre, validado }, index) => (
-                  <div key={index} className="p-4 rounded-lg bg-gray-700">
-                    <p className="font-semibold">ID Usuario: {id}</p>
-                    <p className="font-semibold">Nombre: {nombre}</p>
-                    <p className={`font-semibold ${validado ? 'text-green-500' : 'text-red-500'}`}>
-                      Validado: {validado ? 'Sí' : 'No'}
-                    </p>
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden">
+            <div className="p-6 max-h-[80vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold mb-4">Detalles del Usuario</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {['nombre_completo', 'dni', 'linea_llamadas', 'linea_whatsapp', 'banco', 'cuenta_numero', 'titular_cuenta', 'correo_electronico'].map((field, index) => (
+                  <div key={index} className="bg-gray-700 p-3 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400 text-sm">{field === 'dni' ? 'CC' : field.replace('_', ' ').toUpperCase()}</span>
+                      <FaClipboard 
+                        className="cursor-pointer text-blue-400 hover:text-blue-300"
+                        onClick={() => copiarAlPortapapeles(usuarioSeleccionado[field])}
+                      />
+                    </div>
+                    <p className="font-medium mt-1">{usuarioSeleccionado[field] || 'N/A'}</p>
                   </div>
                 ))}
               </div>
-            ) : (
-              <p className="text-gray-400">No hay usuarios referidos.</p>
-            )}
-
-            <div className="mt-4 flex justify-between">
-              {retiroSeleccionado && retiroSeleccionado.status === 'pendiente' && (
+              
+              {transaccionSeleccionada && (
                 <>
-                  <button 
-                    onClick={() => cambiarEstadoRetiro('aceptado')}
-                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-200 ease-in-out mr-2"
-                  >
-                    Aceptar
-                  </button>
-                  <button 
-                    onClick={eliminarRetiro}
-                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200 ease-in-out"
-                  >
-                    Rechazar
-                  </button>
+                  <hr className="border-gray-700 my-4" />
+                  <h3 className="text-xl font-semibold mb-3">Detalles del Retiro</h3>
+                  <div className="bg-gray-700 p-4 rounded-lg mb-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-400">Monto</p>
+                        <p className="font-medium">${transaccionSeleccionada.monto}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-400">Fecha</p>
+                        <p className="font-medium">{new Date(transaccionSeleccionada.fecha).toLocaleDateString()}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-sm text-gray-400">Descripción</p>
+                        <p className="font-medium">{transaccionSeleccionada.descripcion}</p>
+                      </div>
+                    </div>
+                  </div>
                 </>
               )}
-
-              {retiroSeleccionado && retiroSeleccionado.status === 'aceptado' && (
-                <>
-                  <button 
-                    onClick={() => cambiarEstadoRetiro('pagado')}
-                    className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded transition duration-200 ease-in-out mr-2"
-                  >
-                    Pagar
-                  </button>
-                  <button 
-                    onClick={eliminarRetiro}
-                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200 ease-in-out"
-                  >
-                    Rechazar
-                  </button>
-                </>
-              )}
-
-              {retiroSeleccionado && retiroSeleccionado.status === 'pagado' && (
-                <div className="text-gray-500">
-                  Todos los botones están deshabilitados.
+              
+              {/* <hr className="border-gray-700 my-4" />
+              
+              <h3 className="text-xl font-semibold mb-3">Usuarios Referidos</h3>
+              {usuariosReferidos.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {usuariosReferidos.map(({ id, nombre, validado }, index) => (
+                    <div key={index} className={`p-3 rounded-lg ${validado ? 'bg-green-900 bg-opacity-50' : 'bg-gray-700'}`}>
+                      <div className="flex flex-col md:flex-row justify-between">
+                        <div className="flex-1 mb-2 md:mb-0">
+                          <p className="text-sm text-gray-400">ID Usuario</p>
+                          <p className="font-medium">{id}</p>
+                        </div>
+                        <div className="flex-1 mb-2 md:mb-0">
+                          <p className="text-sm text-gray-400">Nombre</p>
+                          <p className="font-medium">{nombre}</p>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-400">Validado</p>
+                          <p className={`font-medium ${validado ? 'text-green-400' : 'text-red-400'}`}>
+                            {validado ? 'Sí' : 'No'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
+              ) : (
+                <p className="text-gray-400 text-center py-4">No hay usuarios referidos.</p>
+              )} */}
 
-            <button 
-              onClick={cerrarModal}
-              className="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200 ease-in-out"
-            >
-              Cerrar
-            </button>
+              <div className="mt-6">
+                <button 
+                  onClick={cerrarModal}
+                  className="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       <AdminNav />
-    </div>
+      </div>
   );
 };

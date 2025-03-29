@@ -1,0 +1,177 @@
+"use client";
+
+import React, { useState } from "react";
+import { ArrowUpRight, Loader2, X } from "lucide-react";
+
+interface EnviarDineroModalProps {
+  walletId: string;
+  balance: number;
+  onClose: () => void;
+  onEnviar: (data: { destinatarioId: string; monto: number; notas: string }) => Promise<void>;
+}
+
+export function EnviarDineroModal({ walletId, balance, onClose, onEnviar }: EnviarDineroModalProps) {
+  const [destinatarioId, setDestinatarioId] = useState("");
+  const [monto, setMonto] = useState("");
+  const [notas, setNotas] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const formatearSaldo = (saldo: number): string => {
+    return saldo.toLocaleString("es-CO", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  const obtenerSaldoActual = async (): Promise<number> => {
+    try {
+      const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
+      const response = await fetch(
+        `${import.meta.env.VITE_URL_LOCAL}/usuarios/saldo/${usuario._id}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        return data.saldo;
+      }
+      throw new Error("Error al obtener el saldo actual");
+    } catch (error) {
+      console.error("Error:", error);
+      throw error;
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    
+    if (!destinatarioId || !monto) {
+      setError("Por favor completa todos los campos requeridos");
+      return;
+    }
+
+    try {
+      const saldoActual = await obtenerSaldoActual();
+      const montoNum = parseFloat(monto);
+      
+      if (isNaN(montoNum)) {
+        setError("El monto debe ser un número válido");
+        return;
+      }
+
+      if (montoNum <= 0) {
+        setError("El monto debe ser mayor que cero");
+        return;
+      }
+
+      if (montoNum > saldoActual) {
+        setError(`Saldo insuficiente. Tu saldo actual es: COP ${formatearSaldo(saldoActual)}`);
+        return;
+      }
+
+      setLoading(true);
+      await onEnviar({
+        destinatarioId,
+        monto: montoNum,
+        notas
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al enviar el dinero");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-800 rounded-xl max-w-md w-full border border-gray-700 shadow-xl">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <ArrowUpRight className="h-5 w-5 text-blue-400" />
+              Enviar Dinero
+            </h2>
+            <button 
+              onClick={onClose}
+              className="text-gray-400 hover:text-white"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">
+                  ID del Usuario Receptor
+                </label>
+                <input
+                  type="text"
+                  value={destinatarioId}
+                  onChange={(e) => setDestinatarioId(e.target.value)}
+                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  placeholder="ID del Usuario Receptor"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Monto a enviar (COP)
+                </label>
+                <input
+                  type="number"
+                  value={monto}
+                  onChange={(e) => setMonto(e.target.value)}
+                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  placeholder="0.00"
+                  step="0.01"
+                  min="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Saldo disponible: COP {formatearSaldo(balance)}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Notas (opcional)
+                </label>
+                <textarea
+                  value={notas}
+                  onChange={(e) => setNotas(e.target.value)}
+                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  placeholder="Agrega una descripción..."
+                  rows={2}
+                />
+              </div>
+
+              {error && (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                  {error}
+                </div>
+              )}
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 px-6 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    "Confirmar Envío"
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
