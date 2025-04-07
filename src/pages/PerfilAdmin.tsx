@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Background } from '../components/Background';
 import { MobileNav } from '../components/MobileNav';
-import { FaSignOutAlt, FaMoneyBillWave } from 'react-icons/fa';
+import { FaSignOutAlt, FaMoneyBillWave, FaKey } from 'react-icons/fa'; // Importar icono de llave
 import { AdminNav } from '../components/AdminNav';
 
 export const PerfilAdmin = () => {
@@ -42,6 +42,17 @@ export const PerfilAdmin = () => {
             <FaMoneyBillWave className="text-3xl mr-4" />
             <div>
               <h2 className="text-xl font-semibold">Comisiones</h2>
+            </div>
+          </div>
+
+          {/* Tarjeta de Resetear contraseña de usuario */}
+          <div
+            className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center cursor-pointer w-full max-w-md"
+            onClick={() => navigate('/BV/restaurar-password')} // Cambiar la ruta a la correcta
+          >
+            <FaKey className="text-3xl mr-4" /> {/* Icono de llave */}
+            <div>
+              <h2 className="text-xl font-semibold">Restaurar Contraseña a Usuario</h2>
             </div>
           </div>
 

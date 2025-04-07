@@ -20,6 +20,7 @@ import { TotalWithdrawals } from './pages/TotalRetiros';
 import { TotalApprovedContributions } from './pages/TotalAportes';
 import { CrudComisiones } from './pages/CrudComisiones';
 import WalletApp from './pages/Billetera';
+import { CambiarContrasena } from './pages/Rpass';
 
 function App() {
   return (
@@ -45,6 +46,7 @@ function App() {
         <Route path="/BV/retiros" element={ <TotalWithdrawals />} />
         <Route path="/BV/comisiones" element={<CrudComisiones />} />
         <Route path="/BV/aportes" element={<TotalApprovedContributions />} />
+        <Route path="/BV/restaurar-password" element={<CambiarContrasena />} />
 
       </Routes>
     </Router>
