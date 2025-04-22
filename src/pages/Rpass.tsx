@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { AdminNav } from '../components/AdminNav';
 
@@ -9,6 +9,7 @@ export const CambiarContrasena = () => {
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [mensajeColor, setMensajeColor] = useState('');
+  const [usuarioInfo, setUsuarioInfo] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -41,6 +42,29 @@ export const CambiarContrasena = () => {
     }
   };
 
+  const fetchUsuarioInfo = async (userId) => {
+    if (!userId) return;
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setUsuarioInfo(data);
+      } else {
+        setUsuarioInfo(null);
+        setMensaje('Usuario no encontrado.');
+        setMensajeColor('text-red-400');
+      }
+    } catch (error) {
+      setMensaje('Error en la conexión.');
+      setMensajeColor('text-blue-400');
+    }
+  };
+
+  useEffect(() => {
+    fetchUsuarioInfo(id);
+  }, [id]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-800 text-white p-4">
       <form
@@ -64,6 +88,16 @@ export const CambiarContrasena = () => {
             required
           />
         </div>
+
+        {/* Mostrar información del usuario */}
+        {usuarioInfo && (
+          <div className="mb-4">
+            <h3 className="font-medium">Información del Usuario:</h3>
+            <p>Nombre Completo: {usuarioInfo.nombre_completo}</p>
+            <p>Nombre de Usuario: {usuarioInfo.nombre_usuario}</p>
+            <p>Número de regristro: {usuarioInfo.nivel}</p>
+          </div>
+        )}
 
         {/* Campo para Nueva Contraseña */}
         <div className="mb-4">
@@ -119,7 +153,6 @@ export const CambiarContrasena = () => {
         </button>
       </form>
       <AdminNav />
-      
     </div>
   );
 };

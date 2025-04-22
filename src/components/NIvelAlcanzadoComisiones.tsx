@@ -162,7 +162,7 @@ export const NivelAlcanzadoComisiones = () => {
               <span>{username}</span>
             </div>
             <span className="text-sm bg-gray-700 px-2 py-1 rounded">
-              Nivel actual: {nivelUsuario}
+              Nivel actual: {nivelesCompletados}
             </span>
           </div>
         </div>
