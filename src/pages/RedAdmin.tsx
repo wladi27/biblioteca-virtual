@@ -6,68 +6,54 @@ import { AdminNav } from '../components/AdminNav';
 
 export const RedAdmin = () => {
   const [usuarioRaiz, setUsuarioRaiz] = useState(null);
-  const [piramideData, setPiramideData] = useState([]);
+  const [nivelesOrganizados, setNivelesOrganizados] = useState({});
   const [openAcordeon, setOpenAcordeon] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [nivelesCompletos, setNivelesCompletos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(''); // Estado para manejar errores
+  const [usuarioIdInput, setUsuarioIdInput] = useState(''); // Estado para el ID de usuario ingresado
 
   useEffect(() => {
-    const fetchPrimerUsuario = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios`);
-        if (response.ok) {
-          const usuarios = await response.json();
-          if (usuarios.length > 0) {
-            const primerUsuario = usuarios[0];
-            setUsuarioRaiz(primerUsuario);
-            fetchPiramideData(primerUsuario._id);
-          }
-        }
-      } catch (error) {
-        console.error('Error:', error);
-      }
-    };
-
-    const fetchPiramideData = async (usuarioId) => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/piramide/${usuarioId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setPiramideData(data.hijos || []);
-          prepararNivelesCompletos(data.hijos || []);
-        }
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPrimerUsuario();
+    // Se eliminó la llamada para obtener el primer usuario al cargar el componente
   }, []);
 
-  const prepararNivelesCompletos = (data) => {
-    const niveles = [];
-    let currentData = data;
-    let nextLevelData = currentData.flatMap(usuario => usuario.hijos || []);
-
-    for (let nivel = 1; nivel <= 12; nivel++) {
-      const cantidadEsperada = Math.pow(3, nivel);
-      
-      // Tomar usuarios del siguiente nivel si es necesario
-      if (currentData.length < cantidadEsperada && nextLevelData.length > 0) {
-        const usuariosFaltantes = cantidadEsperada - currentData.length;
-        const usuariosParaTomar = Math.min(usuariosFaltantes, nextLevelData.length);
-        currentData = [...currentData, ...nextLevelData.slice(0, usuariosParaTomar)];
-        nextLevelData = nextLevelData.slice(usuariosParaTomar);
+  const fetchPiramideData = async (usuarioId) => {
+    setLoading(true); // Iniciar carga
+    setError(''); // Limpiar errores previos
+    try {
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/piramide-completa/${usuarioId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setUsuarioRaiz(data.usuarios[0]); // Guardar el primer usuario como raíz (puedes cambiar esto si es necesario)
+        organizarPiramidePorNivel(data.usuarios.slice(1)); // Omitir el primer usuario
+      } else {
+        const errorData = await response.json();
+        setError(`Error: ${errorData.message || 'No se pudo obtener la pirámide.'}`);
+        setNivelesOrganizados({}); // Limpiar niveles si hay un error
       }
+    } catch (error) {
+      setError('Error en la conexión. Por favor, verifica el ID del usuario.');
+      console.error('Error:', error);
+    } finally {
+      setLoading(false); // Finalizar carga
+    }
+  };
 
-      niveles[nivel] = currentData.slice(0, cantidadEsperada);
-      currentData = currentData.flatMap(usuario => usuario.hijos || []);
-      nextLevelData = currentData.flatMap(usuario => usuario.hijos || []);
+  const organizarPiramidePorNivel = (usuarios) => {
+    const niveles = {};
+    let indiceUsuario = 0;
+    const totalUsuarios = usuarios.length;
+
+    for (let nivelPiramide = 1; nivelPiramide <= 12; nivelPiramide++) {
+      const cantidadEsperada = Math.pow(3, nivelPiramide);
+      niveles[nivelPiramide] = [];
+
+      while (niveles[nivelPiramide].length < cantidadEsperada && indiceUsuario < totalUsuarios) {
+        niveles[nivelPiramide].push(usuarios[indiceUsuario]);
+        indiceUsuario++;
+      }
     }
 
-    setNivelesCompletos(niveles);
+    setNivelesOrganizados(niveles);
   };
 
   const toggleAcordeon = (nivel) => {
@@ -75,50 +61,48 @@ export const RedAdmin = () => {
   };
 
   const renderAcordeon = (nivel) => {
-    if (nivel > 12) return null;
-
-    const data = nivelesCompletos[nivel] || [];
-    const completado = data.length === Math.pow(3, nivel);
+    const data = nivelesOrganizados[nivel] || [];
     const cantidadEsperada = Math.pow(3, nivel);
+    const completado = data.length >= cantidadEsperada;
 
     return (
       <div className="mb-3" key={`nivel-${nivel}`}>
         <div
-          className={`p-3 rounded-lg flex justify-between items-center cursor-pointer transition-colors ${
-            completado ? 'bg-green-900 bg-opacity-30' : 'bg-gray-800 hover:bg-gray-700'
-          }`}
+          className={`p-3 rounded-lg flex justify-between items-center cursor-pointer ${
+            completado ? 'bg-green-900 bg-opacity-30' : 'bg-gray-800'
+          } hover:bg-opacity-70 transition-all`}
           onClick={() => toggleAcordeon(nivel)}
         >
-          <div className="flex items-center gap-4">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+          <div className="flex items-center gap-3">
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
               completado ? 'bg-green-500' : 'bg-gray-600'
             }`}>
-              <span className="font-medium">{nivel}</span>
+              <span className="text-sm font-medium">{nivel}</span>
             </div>
             <div>
               <h3 className="font-medium">Nivel {nivel}</h3>
-              <span className="text-sm text-gray-300">
+              <p className="text-xs text-gray-300">
                 {data.length} de {cantidadEsperada} usuarios
-              </span>
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`px-2 py-1 rounded text-xs font-medium ${
+            <span className={`text-xs px-2 py-1 rounded ${
               completado ? 'bg-green-500 text-white' : 'bg-gray-600 text-gray-200'
             }`}>
-              {completado ? 'Completo' : 'Incompleto'}
+              {completado ? 'Completo' : 'Pendiente'}
             </span>
             {openAcordeon[nivel] ? <FaChevronUp /> : <FaChevronDown />}
           </div>
         </div>
         
         {openAcordeon[nivel] && (
-          <div className="mt-2 pl-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+          <div className="mt-2 pl-10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {data.map((usuario, index) => (
                 <div 
                   key={`${usuario._id}-${index}`}
-                  className="p-2 bg-gray-800 rounded flex items-center gap-2"
+                  className="p-2 bg-gray-800 rounded flex items-center gap-2 hover:bg-gray-700"
                 >
                   <User className="h-4 w-4 text-gray-400" />
                   <span className="truncate">{usuario.nombre_usuario || `Usuario ${index+1}`}</span>
@@ -133,6 +117,10 @@ export const RedAdmin = () => {
 
   const renderTodosLosNiveles = () => {
     return Array.from({ length: 12 }, (_, i) => i + 1).map(nivel => renderAcordeon(nivel));
+  };
+
+  const handleBuscarPiramide = () => {
+    fetchPiramideData(usuarioIdInput);
   };
 
   if (loading) {
@@ -155,10 +143,30 @@ export const RedAdmin = () => {
           {usuarioRaiz && (
             <div className="flex items-center gap-3 text-gray-300">
               <User className="h-5 w-5" />
-              <span>Usuario raíz: {usuarioRaiz.nombre_completo}</span>
+              <span>Usuario raíz: {usuarioRaiz.nombre_usuario}</span>
             </div>
           )}
         </div>
+
+        {/* Input para buscar por ID de usuario */}
+        <div className="mb-4">
+          <input
+            type="text"
+            value={usuarioIdInput}
+            onChange={(e) => setUsuarioIdInput(e.target.value)}
+            placeholder="Ingrese ID de usuario"
+            className="p-2 rounded-md bg-gray-600 text-white w-full"
+          />
+          <button
+            onClick={handleBuscarPiramide}
+            className="mt-2 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Buscar Pirámide
+          </button>
+        </div>
+
+        {/* Mostrar mensaje de error si existe */}
+        {error && <p className="text-red-400">{error}</p>}
 
         <div className="space-y-3">
           {renderTodosLosNiveles()}
