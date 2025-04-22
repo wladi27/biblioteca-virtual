@@ -3,7 +3,7 @@ import { Background } from '../components/Background';
 import { MobileNav } from '../components/MobileNav';
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { User } from 'lucide-react';
-import { NivelAlcanzadoComponent } from '../components/NivelAlcanzado';
+import { NivelAlcanzadoComponent } from '../components/NIvelAlcanzado';
 
 export const Red = () => {
   const [username, setUsername] = useState('');
