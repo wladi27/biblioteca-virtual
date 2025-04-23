@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { ArrowUpRight, Loader2, X } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { ArrowUpRight, Loader2, X, User } from "lucide-react";
 
 interface EnviarDineroModalProps {
   walletId: string;
@@ -10,12 +10,61 @@ interface EnviarDineroModalProps {
   onEnviar: (data: { destinatarioId: string; monto: number; notas: string }) => Promise<void>;
 }
 
+interface UsuarioInfo {
+  _id: string;
+  nombre_usuario: string;
+  nombre_completo?: string;
+  email?: string;
+  // Agrega otros campos según lo que devuelva tu API
+}
+
 export function EnviarDineroModal({ walletId, balance, onClose, onEnviar }: EnviarDineroModalProps) {
   const [destinatarioId, setDestinatarioId] = useState("");
   const [monto, setMonto] = useState("");
   const [notas, setNotas] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [usuarioInfo, setUsuarioInfo] = useState<UsuarioInfo | null>(null);
+  const [loadingUsuario, setLoadingUsuario] = useState(false);
+
+  // Efecto para buscar información del usuario cuando cambia el ID
+  useEffect(() => {
+    const buscarUsuario = async () => {
+      if (destinatarioId.trim().length === 0) {
+        setUsuarioInfo(null);
+        return;
+      }
+
+      try {
+        setLoadingUsuario(true);
+        const response = await fetch(
+          `${import.meta.env.VITE_URL_LOCAL}/usuarios/${destinatarioId}`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          setUsuarioInfo(data);
+          setError("");
+        } else {
+          setUsuarioInfo(null);
+          setError("Usuario no encontrado");
+        }
+      } catch (err) {
+        setUsuarioInfo(null);
+        setError("Error al buscar el usuario");
+        console.error("Error:", err);
+      } finally {
+        setLoadingUsuario(false);
+      }
+    };
+
+    // Debounce para evitar muchas llamadas mientras escribe
+    const timer = setTimeout(() => {
+      buscarUsuario();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [destinatarioId]);
 
   const formatearSaldo = (saldo: number): string => {
     return saldo.toLocaleString("es-CO", {
@@ -47,6 +96,11 @@ export function EnviarDineroModal({ walletId, balance, onClose, onEnviar }: Envi
     
     if (!destinatarioId || !monto) {
       setError("Por favor completa todos los campos requeridos");
+      return;
+    }
+
+    if (!usuarioInfo) {
+      setError("Por favor verifica que el ID del usuario receptor sea válido");
       return;
     }
 
@@ -113,6 +167,37 @@ export function EnviarDineroModal({ walletId, balance, onClose, onEnviar }: Envi
                   className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                   placeholder="ID del Usuario Receptor"
                 />
+                
+                {/* Contenedor de información del usuario */}
+                {destinatarioId && (
+                  <div className="mt-2">
+                    {loadingUsuario ? (
+                      <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Buscando usuario...
+                      </div>
+                    ) : usuarioInfo ? (
+                      <div className="p-3 bg-gray-700/30 rounded-lg border border-gray-600/50">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-blue-500/20 p-2 rounded-full">
+                            <User className="h-5 w-5 text-blue-400" />
+                          </div>
+                          <div>
+                            <h3 className="font-medium">{usuarioInfo.nombre_completo || usuarioInfo.nombre_usuario}</h3>
+                            <p className="text-xs text-gray-400">@{usuarioInfo.nombre_usuario}</p>
+                            {usuarioInfo.email && (
+                              <p className="text-xs text-gray-400 mt-1">{usuarioInfo.email}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-red-400">
+                        {error || "Introduce un ID de usuario válido"}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -146,7 +231,7 @@ export function EnviarDineroModal({ walletId, balance, onClose, onEnviar }: Envi
                 />
               </div>
 
-              {error && (
+              {error && !destinatarioId && (
                 <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
                   {error}
                 </div>
@@ -155,7 +240,7 @@ export function EnviarDineroModal({ walletId, balance, onClose, onEnviar }: Envi
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !usuarioInfo}
                   className="w-full py-3 px-6 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
                   {loading ? (
