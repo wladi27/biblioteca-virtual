@@ -20,6 +20,7 @@ export default function WalletApp() {
   const [billeteraActiva, setBilleteraActiva] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [userId, setUserId] = useState(""); // Almacena el ID del usuario
   const [walletId, setWalletId] = useState("");
   const [copied, setCopied] = useState(false);
   const [historial, setHistorial] = useState([]);
@@ -32,6 +33,7 @@ export default function WalletApp() {
     const usuario = localStorage.getItem("usuario");
     if (usuario) {
       const userData = JSON.parse(usuario);
+      setUserId(userData._id); // Almacena el ID del usuario
       verificarBilletera(userData._id);
       obtenerSaldoUsuario(userData._id);
       obtenerHistorialTransacciones(userData._id);
@@ -90,9 +92,7 @@ export default function WalletApp() {
   const obtenerHistorialTransacciones = async (usuarioId) => {
     try {
       const response = await fetch(
-        `${
-          import.meta.env.VITE_URL_LOCAL
-        }/api/transacciones/transacciones/${usuarioId}`
+        `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${usuarioId}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -134,11 +134,7 @@ export default function WalletApp() {
     }
   };
 
-  const handleEnviarDinero = async ({ destinatarioId, monto, notas }: {
-    destinatarioId: string;
-    monto: number;
-    notas: string;
-  }) => {
+  const handleEnviarDinero = async ({ destinatarioId, monto, notas }) => {
     try {
       const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
       const token = localStorage.getItem("token");
@@ -169,10 +165,7 @@ export default function WalletApp() {
     }
   };
 
-  const handleRetirarDinero = async ({ monto, notas }: {
-    monto: number;
-    notas: string;
-  }) => {
+  const handleRetirarDinero = async ({ monto, notas }) => {
     try {
       const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
       const token = localStorage.getItem("token");
@@ -203,9 +196,9 @@ export default function WalletApp() {
   };
 
   const copiarAlPortapapeles = () => {
-    if (walletId) {
+    if (userId) { // Cambiado de walletId a userId
       navigator.clipboard
-        .writeText(walletId)
+        .writeText(userId)
         .then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
@@ -359,13 +352,13 @@ export default function WalletApp() {
                   </div>
                 </div>
 
-                {/* ID de billetera - Mejorado */}
+                {/* ID de usuario - Mejorado */}
                 <div className="bg-gray-800/50 rounded-lg p-4 mb-6 border border-gray-700/50">
                   <p className="text-gray-400 text-sm mb-2">
-                    ID de tu billetera
+                    ID de tu Wallet
                   </p>
                   <div className="flex items-center justify-between bg-gray-900/30 rounded px-3 py-2">
-                    <p className="font-mono text-sm truncate">{walletId}</p>
+                    <p className="font-mono text-sm truncate">{userId}</p> {/* Muestra el ID del usuario */}
                     <button
                       onClick={copiarAlPortapapeles}
                       className="text-blue-400 hover:text-blue-300 transition-colors ml-2 flex items-center"
@@ -448,8 +441,8 @@ export default function WalletApp() {
                 />
               </div>
 
-              {/* Lista de transacciones - Diseño mejorado */}
-              <div className="space-y-3">
+                            {/* Lista de transacciones - Diseño mejorado */}
+                            <div className="space-y-3">
                 {filtrarTransacciones().length === 0 ? (
                   <div className="text-center py-8 text-gray-500 bg-gray-700/30 rounded-lg">
                     <p>No se encontraron transacciones</p>
