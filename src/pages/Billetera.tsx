@@ -9,6 +9,7 @@ import {
   Loader2,
   Filter,
   Search,
+  RefreshCw,
 } from "lucide-react";
 import { Background } from "../components/Background";
 import { MobileNav } from "../components/MobileNav";
@@ -20,7 +21,7 @@ export default function WalletApp() {
   const [billeteraActiva, setBilleteraActiva] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [userId, setUserId] = useState(""); // Almacena el ID del usuario
+  const [userId, setUserId] = useState("");
   const [walletId, setWalletId] = useState("");
   const [copied, setCopied] = useState(false);
   const [historial, setHistorial] = useState([]);
@@ -28,12 +29,72 @@ export default function WalletApp() {
   const [busqueda, setBusqueda] = useState("");
   const [showEnviarModal, setShowEnviarModal] = useState(false);
   const [showRetirarModal, setShowRetirarModal] = useState(false);
+  const [moneda, setMoneda] = useState("COP");
+  const [tasaCambio, setTasaCambio] = useState(0);
+  const [loadingTasa, setLoadingTasa] = useState(false);
+
+  // Función para obtener la tasa de cambio
+  const obtenerTasaCambio = async () => {
+    setLoadingTasa(true);
+    try {
+      const response = await fetch(
+        "https://magicloops.dev/api/loop/09e4133a-87a1-44ed-8e9f-03c37efafbf4/run"
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setTasaCambio(parseFloat(data.usdToCop));
+      }
+    } catch (error) {
+      console.error("Error al obtener tasa de cambio:", error);
+    } finally {
+      setLoadingTasa(false);
+    }
+  };
+
+  // Convertir el saldo a dólares
+  const convertirADolares = (saldo) => {
+    if (tasaCambio === 0) return 0;
+    return saldo / tasaCambio;
+  };
+
+  // Formatear el saldo según la moneda seleccionada
+  const formatearSaldo = (saldo) => {
+    if (moneda === "USD") {
+      const dolares = convertirADolares(saldo);
+      return dolares.toLocaleString("en-US", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    } else {
+      return saldo.toLocaleString("es-CO", {
+        style: "currency",
+        currency: "COP",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+  };
+
+  // Alternar entre monedas
+  const cambiarMoneda = () => {
+    if (moneda === "COP") {
+      // Si vamos a mostrar USD, obtener la tasa de cambio si no la tenemos
+      if (tasaCambio === 0) {
+        obtenerTasaCambio();
+      }
+      setMoneda("USD");
+    } else {
+      setMoneda("COP");
+    }
+  };
 
   useEffect(() => {
     const usuario = localStorage.getItem("usuario");
     if (usuario) {
       const userData = JSON.parse(usuario);
-      setUserId(userData._id); // Almacena el ID del usuario
+      setUserId(userData._id);
       verificarBilletera(userData._id);
       obtenerSaldoUsuario(userData._id);
       obtenerHistorialTransacciones(userData._id);
@@ -157,7 +218,6 @@ export default function WalletApp() {
         throw new Error(errorData.mensaje || "Error al enviar el dinero");
       }
 
-      // Actualizar saldo y historial
       await obtenerSaldoUsuario(usuario._id);
       await obtenerHistorialTransacciones(usuario._id);
     } catch (error) {
@@ -187,7 +247,6 @@ export default function WalletApp() {
         throw new Error(errorData.mensaje || "Error al retirar el dinero");
       }
 
-      // Actualizar saldo y historial
       await obtenerSaldoUsuario(usuario._id);
       await obtenerHistorialTransacciones(usuario._id);
     } catch (error) {
@@ -196,7 +255,7 @@ export default function WalletApp() {
   };
 
   const copiarAlPortapapeles = () => {
-    if (userId) { // Cambiado de walletId a userId
+    if (userId) {
       navigator.clipboard
         .writeText(userId)
         .then(() => {
@@ -207,13 +266,6 @@ export default function WalletApp() {
           console.error("Error al copiar: ", err);
         });
     }
-  };
-
-  const formatearSaldo = (saldo) => {
-    return saldo.toLocaleString("es-CO", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
   };
 
   const obtenerTamañoFuenteSaldo = (saldo) => {
@@ -232,7 +284,7 @@ export default function WalletApp() {
         if (filtro === "gastos") {
           return t.tipo === "retiro" || t.tipo === "envio";
         }
-        return true; // Para "todos"
+        return true;
       });
     }
 
@@ -340,12 +392,34 @@ export default function WalletApp() {
                 <div className="flex justify-between items-start mb-6">
                   <div>
                     <p className="text-gray-400 text-sm">Balance disponible</p>
-                    <h2
-                      className="font-bold mt-1"
-                      style={{ fontSize: obtenerTamañoFuenteSaldo(balance) }}
-                    >
-                      COP {formatearSaldo(balance)}
-                    </h2>
+                    <div className="flex items-center gap-2">
+                      <h2
+                        className="font-bold mt-1"
+                        style={{ fontSize: obtenerTamañoFuenteSaldo(balance) }}
+                      >
+                        {formatearSaldo(balance)}
+                      </h2>
+                      <button
+                        onClick={cambiarMoneda}
+                        disabled={loadingTasa}
+                        className="flex items-center gap-1 text-sm bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded-md transition-colors"
+                        title={`Mostrar en ${moneda === "COP" ? "USD" : "COP"}`}
+                      >
+                        {loadingTasa ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3" />
+                        )}
+                        <span className="text-xs font-mono">
+                          {moneda === "COP" ? "USD" : "COP"}
+                        </span>
+                      </button>
+                    </div>
+                    {moneda === "USD" && tasaCambio > 0 && (
+                      <p className="text-gray-400 text-xs mt-1">
+                        Tasa: 1 USD = {tasaCambio.toLocaleString("es-CO")} COP
+                      </p>
+                    )}
                   </div>
                   <div className="h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center">
                     <CreditCard className="h-5 w-5 text-green-400" />
@@ -354,20 +428,16 @@ export default function WalletApp() {
 
                 {/* ID de usuario - Mejorado */}
                 <div className="bg-gray-800/50 rounded-lg p-4 mb-6 border border-gray-700/50">
-                  <p className="text-gray-400 text-sm mb-2">
-                    ID de tu Wallet
-                  </p>
+                  <p className="text-gray-400 text-sm mb-2">ID de tu Wallet</p>
                   <div className="flex items-center justify-between bg-gray-900/30 rounded px-3 py-2">
-                    <p className="font-mono text-sm truncate">{userId}</p> {/* Muestra el ID del usuario */}
+                    <p className="font-mono text-sm truncate">{userId}</p>
                     <button
                       onClick={copiarAlPortapapeles}
                       className="text-blue-400 hover:text-blue-300 transition-colors ml-2 flex items-center"
                       title="Copiar ID"
                     >
                       {copied ? (
-                        <span className="text-green-400 text-xs">
-                          ¡Copiado!
-                        </span>
+                        <span className="text-green-400 text-xs">¡Copiado!</span>
                       ) : (
                         <>
                           <Clipboard className="h-4 w-4" />
@@ -441,8 +511,8 @@ export default function WalletApp() {
                 />
               </div>
 
-                            {/* Lista de transacciones - Diseño mejorado */}
-                            <div className="space-y-3">
+              {/* Lista de transacciones - Diseño mejorado */}
+              <div className="space-y-3">
                 {filtrarTransacciones().length === 0 ? (
                   <div className="text-center py-8 text-gray-500 bg-gray-700/30 rounded-lg">
                     <p>No se encontraron transacciones</p>
@@ -473,7 +543,11 @@ export default function WalletApp() {
                           transaccion.tipo === "envio"
                             ? "-"
                             : "+"}{" "}
-                          COP {formatearSaldo(transaccion.monto)}
+                          COP{" "}
+                          {transaccion.monto.toLocaleString("es-CO", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </p>
                       </div>
                       {transaccion.notas && (
