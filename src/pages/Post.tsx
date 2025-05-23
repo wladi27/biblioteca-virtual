@@ -103,6 +103,24 @@ export const CreatePublication = () => {
     }
   };
 
+  const renderFile = (file) => {
+    const fileExtension = file.split('.').pop().toLowerCase();
+    const fileUrl = `${import.meta.env.VITE_URL_LOCAL}/${file}`;
+
+    if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+      return <img src={fileUrl} alt="Publicación" className="w-full h-auto" />;
+    } else if (['mp4', 'webm', 'ogg'].includes(fileExtension)) {
+      return (
+        <video controls className="w-full h-auto">
+          <source src={fileUrl} type={`video/${fileExtension}`} />
+          Tu navegador no soporta la etiqueta de video.
+        </video>
+      );
+    } else {
+      return <p>Archivo no soportado</p>;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <Background />
@@ -129,7 +147,7 @@ export const CreatePublication = () => {
               <h3 className="text-lg font-bold">{pub.titulo}</h3>
               <p>{pub.descripcion}</p>
               <p>Status: {pub.status}</p>
-              <img src={`${import.meta.env.VITE_URL_LOCAL}/${pub.file}`} alt={pub.titulo} className="w-full h-auto" />
+              {renderFile(pub.file)} {/* Llama a la función renderFile */}
               <div className="flex justify-between mt-4">
                 <button
                   onClick={() => handleEdit(pub)}

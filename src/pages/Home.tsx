@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Background } from '../components/Background';
 import { Navbar } from '../components/Navbar';
 import { HeroSection } from '../components/HeroSection';
@@ -6,6 +6,51 @@ import { Features } from '../components/Features';
 import { Testimonials } from '../components/Testimonials';
 
 export const Home = () => {
+  const [publicaciones, setPublicaciones] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    const fetchPublicaciones = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/publicaciones`);
+        if (response.ok) {
+          const data = await response.json();
+          const activePosts = data.filter(post => post.status === 'activo'); // Filtrar solo publicaciones activas
+          setPublicaciones(activePosts);
+          if (activePosts.length > 0) {
+            setShowModal(true); // Mostrar modal si hay publicaciones activas
+          }
+        }
+      } catch (error) {
+        console.error('Error al obtener publicaciones:', error);
+      }
+    };
+
+    fetchPublicaciones();
+  }, []);
+
+  const renderFile = (file) => {
+    const fileExtension = file.split('.').pop().toLowerCase();
+    const fileUrl = `${import.meta.env.VITE_URL_LOCAL}/${file}`;
+
+    if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+      return <img src={fileUrl} alt="Publicación" className="w-full h-auto" />;
+    } else if (['mp4', 'webm', 'ogg'].includes(fileExtension)) {
+      return (
+        <video controls className="w-full h-auto">
+          <source src={fileUrl} type={`video/${fileExtension}`} />
+          Tu navegador no soporta la etiqueta de video.
+        </video>
+      );
+    } else {
+      return <p className="text-gray-400">Archivo no soportado</p>;
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <Background />
@@ -27,7 +72,38 @@ export const Home = () => {
         </div>
 
         <Testimonials />
-        
+
+        {/* Modal para mostrar las publicaciones activas */}
+        {showModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+            <div className="bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden">
+              <div className="p-6">
+                <h2 className="text-2xl font-bold mb-4">Publicaciones Activas</h2>
+                {publicaciones.length > 0 ? (
+                  publicaciones.map((post) => (
+                    <div key={post._id} className="mb-4">
+                      <h3 className="text-lg font-semibold">{post.titulo}</h3>
+                      {renderFile(post.file)}
+                      <p className="text-gray-300 mb-2 whitespace-pre-line">{post.descripcion}</p>
+                      <hr className="border-gray-600 my-2" />
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-400">No hay publicaciones activas disponibles.</p>
+                )}
+                <div className="flex justify-end">
+                  <button
+                    className="bg-gray-700 hover:bg-gray-600 text-white py-2 px-6 rounded-lg transition-colors"
+                    onClick={handleCloseModal}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="py-16">
           <div className="relative rounded-2xl overflow-hidden">
             <img
@@ -68,7 +144,7 @@ export const Home = () => {
             <div>
               <h3 className="font-semibold mb-4">Legal</h3>
               <a href="/terminos-y-condiciones" className="text-sm text-gray-400 hover:underline">
-              Términos y Condiciones
+                Términos y Condiciones
               </a>
             </div>
           </div>

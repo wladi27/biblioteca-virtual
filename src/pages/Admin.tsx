@@ -95,7 +95,7 @@ export const Admin = () => {
           const aporte = aportes.find(aporte => aporte.usuarioId === usuario._id);
           return {
             id: usuario._id,
-            nombre: usuario.nombre_completo, // Asegúrate de que este campo existe
+            nombre: usuario.nombre_completo,
             validado: aporte ? aporte.aporte : false
           };
         });
@@ -132,6 +132,36 @@ export const Admin = () => {
     navigator.clipboard.writeText(texto)
       .then(() => alert('Datos copiados al portapapeles'))
       .catch(err => console.error('Error al copiar:', err));
+  };
+
+  const cambiarEstadoTransaccion = async () => {
+    if (!transaccionSeleccionada) return;
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${transaccionSeleccionada._id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ estado: 'aprobado' }),
+      });
+
+      if (!response.ok) throw new Error('Error al actualizar el estado de la transacción');
+
+      // Actualizar el estado local
+      setTransacciones(prevTransacciones =>
+        prevTransacciones.map(transaccion =>
+          transaccion._id === transaccionSeleccionada._id
+            ? { ...transaccion, estado: 'aprobado' }
+            : transaccion
+        )
+      );
+
+      // Cerrar el modal
+      cerrarModal();
+    } catch (error) {
+      setError(error.message);
+    }
   };
 
   return (
@@ -246,15 +276,17 @@ export const Admin = () => {
                     <tbody className="bg-gray-800 divide-y divide-gray-600">
                       {filtrarTransacciones().map((transaccion) => {
                         const usuario = todosLosUsuarios.find(u => u._id === transaccion.usuario_id);
+                        const estadoColor = transaccion.estado === 'pendiente' ? 'text-green-500' : 'text-red-500';
+
                         return (
                           <tr key={transaccion._id} className="hover:bg-gray-700 transition-colors">
-                            <td className="px-4 py-3 whitespace-nowrap text-gray-300">{transaccion.usuario_id}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-gray-300">
+                            <td className={`px-4 py-3 whitespace-nowrap ${estadoColor}`}>{transaccion.usuario_id}</td>
+                            <td className={`px-4 py-3 whitespace-nowrap ${estadoColor}`}>
                               {usuario ? usuario.nombre_completo : 'Usuario no encontrado'}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-gray-300">${transaccion.monto}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-gray-300">{transaccion.descripcion}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-gray-300">
+                            <td className={`px-4 py-3 whitespace-nowrap ${estadoColor}`}>${transaccion.monto}</td>
+                            <td className={`px-4 py-3 whitespace-nowrap ${estadoColor}`}>{transaccion.descripcion}</td>
+                            <td className={`px-4 py-3 whitespace-nowrap ${estadoColor}`}>
                               {new Date(transaccion.fecha).toLocaleDateString()}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
@@ -321,38 +353,15 @@ export const Admin = () => {
                       </div>
                     </div>
                   </div>
+
+                  <button 
+                    onClick={cambiarEstadoTransaccion}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded transition-colors mb-4"
+                  >
+                    Marcar como Aprobado
+                  </button>
                 </>
               )}
-              
-              {/* <hr className="border-gray-700 my-4" />
-              
-              <h3 className="text-xl font-semibold mb-3">Usuarios Referidos</h3>
-              {usuariosReferidos.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {usuariosReferidos.map(({ id, nombre, validado }, index) => (
-                    <div key={index} className={`p-3 rounded-lg ${validado ? 'bg-green-900 bg-opacity-50' : 'bg-gray-700'}`}>
-                      <div className="flex flex-col md:flex-row justify-between">
-                        <div className="flex-1 mb-2 md:mb-0">
-                          <p className="text-sm text-gray-400">ID Usuario</p>
-                          <p className="font-medium">{id}</p>
-                        </div>
-                        <div className="flex-1 mb-2 md:mb-0">
-                          <p className="text-sm text-gray-400">Nombre</p>
-                          <p className="font-medium">{nombre}</p>
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-400">Validado</p>
-                          <p className={`font-medium ${validado ? 'text-green-400' : 'text-red-400'}`}>
-                            {validado ? 'Sí' : 'No'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-400 text-center py-4">No hay usuarios referidos.</p>
-              )} */}
 
               <div className="mt-6">
                 <button 
@@ -368,6 +377,6 @@ export const Admin = () => {
       )}
 
       <AdminNav />
-      </div>
+    </div>
   );
 };

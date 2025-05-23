@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Background } from '../components/Background';
 import { MobileNav } from '../components/MobileNav';
-import { FaSignOutAlt, FaMoneyBillWave, FaKey } from 'react-icons/fa'; // Importar icono de llave
+import { FaSignOutAlt, FaMoneyBillWave, FaKey, FaDownload } from 'react-icons/fa'; // Importar icono de descarga
 import { AdminNav } from '../components/AdminNav';
 
 export const PerfilAdmin = () => {
@@ -45,7 +45,7 @@ export const PerfilAdmin = () => {
             </div>
           </div>
 
-          {/* Recarga */}
+          {/* Tarjeta de Recarga */}
           <div
             className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center cursor-pointer w-full max-w-md"
             onClick={() => navigate('/BV/recarga')}
@@ -64,6 +64,17 @@ export const PerfilAdmin = () => {
             <FaKey className="text-3xl mr-4" /> {/* Icono de llave */}
             <div>
               <h2 className="text-xl font-semibold">Restaurar Contraseña a Usuario</h2>
+            </div>
+          </div>
+
+          {/* Tarjeta de Descargar Datos */}
+          <div
+            className="bg-gray-700 bg-opacity-30 p-6 rounded-lg shadow-md flex items-center cursor-pointer w-full max-w-md"
+            onClick={() => navigate('/BV/descargar-datos')} // Cambiar la ruta a la correcta
+          >
+            <FaDownload className="text-3xl mr-4" /> {/* Icono de descarga */}
+            <div>
+              <h2 className="text-xl font-semibold">Descargar Datos</h2>
             </div>
           </div>
 
