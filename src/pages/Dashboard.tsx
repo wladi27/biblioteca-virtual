@@ -2,40 +2,22 @@ import React, { useEffect, useState } from 'react';
 import { Background } from '../components/Background';
 import { MobileNav } from '../components/MobileNav';
 import { FaDollarSign, FaCode, FaHistory, FaWhatsapp } from 'react-icons/fa';
-import { NivelAlcanzadoComponent } from '../components/NIvelAlcanzado';
+import { NivelAlcanzadoComponent } from '../components/NivelAlcanzado';
 
 export const Dashboard = () => {
   const [comisiones, setComisiones] = useState(0);
   const [codigosCreados, setCodigosCreados] = useState(0);
   const [retiros, setRetiros] = useState([]);
+  const [filteredRetiros, setFilteredRetiros] = useState([]);
   const [aporteDado, setAporteDado] = useState(() => {
     return localStorage.getItem('aporteDado') === 'true';
   });
   const [comprobanteSubido, setComprobanteSubido] = useState(() => {
     return localStorage.getItem('comprobanteSubido') === 'true';
   });
-  const [postActivo, setPostActivo] = useState(null);
-  const [showPostModal, setShowPostModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    const fetchPostActivo = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/publicaciones`);
-        if (response.ok) {
-          const data = await response.json();
-          const post = data.find(post => post.status === 'activo');
-          setPostActivo(post);
-          if (post) {
-            setShowPostModal(true);
-          }
-        }
-      } catch (error) {
-        console.error('Error:', error);
-      }
-    };
-
-    fetchPostActivo();
-
     const usuario = localStorage.getItem('usuario');
     if (usuario) {
       const userData = JSON.parse(usuario);
@@ -47,10 +29,14 @@ export const Dashboard = () => {
 
   const fetchRetiros = async (userId) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/withdrawals/usuario/${userId}`);
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones`);
       if (response.ok) {
         const data = await response.json();
-        setRetiros(data.length > 0 ? data : []);
+        const userRetiros = data.filter(transaccion => 
+          transaccion.tipo === 'retiro' && transaccion.usuario_id === userId
+        );
+        setRetiros(userRetiros);
+        setFilteredRetiros(userRetiros); // Inicialmente, mostrar todos los retiros
       }
     } catch (error) {
       console.error('Error:', error);
@@ -67,6 +53,15 @@ export const Dashboard = () => {
     } catch (error) {
       console.error('Error:', error);
     }
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    // Filtrar los retiros basado en el término de búsqueda
+    const filtered = retiros.filter(retiro => 
+      retiro.descripcion.toLowerCase().includes(e.target.value.toLowerCase())
+    );
+    setFilteredRetiros(filtered);
   };
 
   const handleAporteClick = async () => {
@@ -112,10 +107,6 @@ export const Dashboard = () => {
     }
   };
 
-  const handleClosePostModal = () => {
-    setShowPostModal(false);
-  };
-
   return (
     <div className="min-h-screen flex flex-col text-white">
       <Background />
@@ -134,7 +125,7 @@ export const Dashboard = () => {
             {/* Sección de estadísticas */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <NivelAlcanzadoComponent />
-              
+
               {/* Tarjeta de códigos creados */}
               <div className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border-l-4 border-blue-400 transition-all hover:shadow-lg">
                 <div className="flex items-center">
@@ -180,8 +171,17 @@ export const Dashboard = () => {
               <h2 className="text-xl font-semibold mb-4 flex items-center">
                 <FaHistory className="mr-2" /> Historial de Retiros
               </h2>
+
+              {/* Campo de búsqueda */}
+              <input
+                type="text"
+                placeholder="Buscar por descripción..."
+                value={searchTerm}
+                onChange={handleSearchChange}
+                className="w-full p-2 mb-4 bg-gray-600 rounded-md text-gray-200"
+              />
               
-              {retiros.length > 0 ? (
+              {filteredRetiros.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-600">
                     <thead>
@@ -192,16 +192,16 @@ export const Dashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-gray-800 divide-y divide-gray-600">
-                      {retiros.map((retiro) => (
+                      {filteredRetiros.map((retiro) => (
                         <tr key={retiro._id} className="hover:bg-gray-700 transition-colors">
                           <td className="px-4 py-3 whitespace-nowrap text-gray-300">${retiro.monto}</td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className={`px-2 py-1 rounded-full text-xs ${
-                              retiro.status === 'completado' 
+                              retiro.estado === 'aprobado' 
                                 ? 'bg-green-500 text-white' 
-                                : 'bg-yellow-500 text-gray-800'
+                                : 'bg-red-500 text-white'
                             }`}>
-                              {retiro.status}
+                              {retiro.estado}
                             </span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-gray-300">
@@ -221,35 +221,6 @@ export const Dashboard = () => {
           </div>
         </div>
       </div>
-
-      {/* Modal para publicación activa */}
-      {postActivo && showPostModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden">
-            <div className="p-6">
-              <h2 className="text-2xl font-bold mb-4">{postActivo.titulo}</h2>
-              {postActivo.file && (
-                <div className="mb-4 rounded-lg overflow-hidden">
-                  <img 
-                    src={`${import.meta.env.VITE_URL_LOCAL}/${postActivo.file}`} 
-                    alt={postActivo.titulo} 
-                    className="w-full h-auto max-h-96 object-contain"
-                  />
-                </div>
-              )}
-              <p className="text-gray-300 mb-6 whitespace-pre-line">{postActivo.descripcion}</p>
-              <div className="flex justify-end">
-                <button
-                  className="bg-gray-700 hover:bg-gray-600 text-white py-2 px-6 rounded-lg transition-colors"
-                  onClick={handleClosePostModal}
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <MobileNav />
     </div>
