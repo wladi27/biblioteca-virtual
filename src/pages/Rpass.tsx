@@ -16,7 +16,7 @@ export const CambiarContrasena = () => {
 
     if (nuevaContrasena !== confirmarContrasena) {
       setMensaje('Las contraseñas no coinciden.');
-      setMensajeColor('text-red-400'); // Color rojo para error
+      setMensajeColor('text-red-400');
       return;
     }
 
@@ -31,14 +31,14 @@ export const CambiarContrasena = () => {
 
       if (response.ok) {
         setMensaje('Contraseña actualizada exitosamente.');
-        setMensajeColor('text-green-400'); // Color verde para éxito
+        setMensajeColor('text-green-400');
       } else {
         setMensaje('Error al actualizar la contraseña.');
-        setMensajeColor('text-red-400'); // Color rojo para error
+        setMensajeColor('text-red-400');
       }
     } catch (error) {
       setMensaje('Error en la conexión.');
-      setMensajeColor('text-blue-400'); // Color azul para error de conexión
+      setMensajeColor('text-blue-400');
     }
   };
 
@@ -66,17 +66,19 @@ export const CambiarContrasena = () => {
   }, [id]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-800 text-white p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-blue-900 text-white p-4">
       <form
-        className="bg-gray-700 p-8 rounded-lg shadow-lg w-full max-w-md"
+        className="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-lg border border-blue-700"
         onSubmit={handleSubmit}
       >
-        <h2 className="text-2xl font-bold mb-4 text-center">Cambiar Contraseña</h2>
-        {mensaje && <p className={`mb-4 ${mensajeColor} text-center`}>{mensaje}</p>}
-        
+        <h2 className="text-3xl font-extrabold mb-6 text-center flex items-center justify-center text-blue-400 drop-shadow">
+          Cambiar Contraseña
+        </h2>
+        {mensaje && <p className={`mb-4 ${mensajeColor} text-center font-semibold`}>{mensaje}</p>}
+
         {/* Campo para ID de usuario */}
         <div className="mb-4">
-          <label className="block mb-2" htmlFor="userId">
+          <label className="block mb-2 font-semibold text-blue-300" htmlFor="userId">
             ID del Usuario
           </label>
           <input
@@ -84,24 +86,33 @@ export const CambiarContrasena = () => {
             id="userId"
             value={id}
             onChange={(e) => setId(e.target.value)}
-            className="w-full p-2 rounded-md bg-gray-600 text-white"
+            className="w-full p-3 rounded-lg bg-gray-700 text-white border border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
             required
+            placeholder="Ingresa el ID del usuario"
           />
         </div>
 
-        {/* Mostrar información del usuario */}
-        {usuarioInfo && (
-          <div className="mb-4">
-            <h3 className="font-medium">Información del Usuario:</h3>
-            <p>Nombre Completo: {usuarioInfo.nombre_completo}</p>
-            <p>Nombre de Usuario: {usuarioInfo.nombre_usuario}</p>
-            <p>Número de regristro: {usuarioInfo.nivel}</p>
+        {/* Card de usuario */}
+        {id && (
+          <div className="mb-6">
+            {usuarioInfo ? (
+              <div className="flex items-center gap-4 bg-gradient-to-r from-blue-800 to-blue-600 rounded-xl p-4 shadow-lg border border-blue-400">
+                <div className="flex flex-col">
+                  <span className="font-bold text-lg text-white">{usuarioInfo.nombre_completo}</span>
+                  <span className="text-blue-200 font-mono">@{usuarioInfo.nombre_usuario}</span>
+                  <span className="text-xs text-blue-100 mt-1">ID: <span className="font-mono">{usuarioInfo._id}</span></span>
+                  <span className="text-xs text-blue-100 mt-1">Nivel: <span className="font-mono">{usuarioInfo.nivel}</span></span>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-red-700 text-white rounded-lg p-3 text-center font-semibold shadow">Usuario no encontrado</div>
+            )}
           </div>
         )}
 
         {/* Campo para Nueva Contraseña */}
         <div className="mb-4">
-          <label className="block mb-2" htmlFor="nuevaContrasena">
+          <label className="block mb-2 font-semibold text-blue-300" htmlFor="nuevaContrasena">
             Nueva Contraseña
           </label>
           <div className="relative">
@@ -110,11 +121,12 @@ export const CambiarContrasena = () => {
               id="nuevaContrasena"
               value={nuevaContrasena}
               onChange={(e) => setNuevaContrasena(e.target.value)}
-              className="w-full p-2 rounded-md bg-gray-600 text-white"
+              className="w-full p-3 rounded-lg bg-gray-700 text-white border border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
               required
+              placeholder="Nueva contraseña"
             />
             <span
-              className="absolute right-2 top-2 cursor-pointer"
+              className="absolute right-3 top-3 cursor-pointer text-blue-300"
               onClick={() => setMostrarContrasena(!mostrarContrasena)}
             >
               {mostrarContrasena ? <FaEyeSlash /> : <FaEye />}
@@ -124,7 +136,7 @@ export const CambiarContrasena = () => {
 
         {/* Campo para Confirmar Nueva Contraseña */}
         <div className="mb-6">
-          <label className="block mb-2" htmlFor="confirmarContrasena">
+          <label className="block mb-2 font-semibold text-blue-300" htmlFor="confirmarContrasena">
             Confirmar Nueva Contraseña
           </label>
           <div className="relative">
@@ -133,11 +145,12 @@ export const CambiarContrasena = () => {
               id="confirmarContrasena"
               value={confirmarContrasena}
               onChange={(e) => setConfirmarContrasena(e.target.value)}
-              className="w-full p-2 rounded-md bg-gray-600 text-white"
+              className="w-full p-3 rounded-lg bg-gray-700 text-white border border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
               required
+              placeholder="Confirma la nueva contraseña"
             />
             <span
-              className="absolute right-2 top-2 cursor-pointer"
+              className="absolute right-3 top-3 cursor-pointer text-blue-300"
               onClick={() => setMostrarContrasena(!mostrarContrasena)}
             >
               {mostrarContrasena ? <FaEyeSlash /> : <FaEye />}
@@ -147,12 +160,14 @@ export const CambiarContrasena = () => {
 
         <button
           type="submit"
-          className="bg-blue-600 text-white py-2 px-4 rounded-md w-full hover:bg-blue-700 transition-colors"
+          className="bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3 px-4 rounded-lg w-full hover:from-blue-700 hover:to-blue-600 transition-all font-bold shadow-lg"
         >
           Cambiar Contraseña
         </button>
       </form>
-      <AdminNav />
+      <div className="mt-20 w-full">
+        <AdminNav />
+      </div>
     </div>
   );
 };

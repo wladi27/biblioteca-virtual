@@ -1,20 +1,18 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Background } from '../components/Background';
 import { AdminNav } from '../components/AdminNav';
-import { FaSearch } from 'react-icons/fa';
-import debounce from 'lodash/debounce'; // Importación de debounce
+import { FaSearch, FaUserCircle, FaUserFriends } from 'react-icons/fa';
+import debounce from 'lodash/debounce';
 
 export const TotalApprovedContributions = () => {
   const [contributions, setContributions] = useState([]);
   const [filtro, setFiltro] = useState('');
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | null }>(null);
 
-  // Cargar aportes aprobados al montar el componente
   useEffect(() => {
     fetchContributions();
   }, []);
 
-  // Función para obtener los aportes aprobados
   const fetchContributions = async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/aportes`);
@@ -50,7 +48,6 @@ export const TotalApprovedContributions = () => {
     }
   };
 
-  // Función de filtrado con debounce
   const handleFiltroChange = useCallback(
     debounce((value: string) => {
       setFiltro(value);
@@ -58,65 +55,79 @@ export const TotalApprovedContributions = () => {
     []
   );
 
-  // Filtrar aportes usando useMemo para evitar recalculos innecesarios
   const contributionsFiltradas = useMemo(() => {
     return contributions.filter(contribution =>
-      contribution.usuarioId.toLowerCase().includes(filtro.toLowerCase())
+      (contribution.usuario?.nombre_completo?.toLowerCase().includes(filtro.toLowerCase()) ||
+        contribution.usuarioId.toLowerCase().includes(filtro.toLowerCase()))
     );
   }, [contributions, filtro]);
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-blue-900 text-white">
       <Background />
 
       <div className="max-w-2xl mx-auto px-4 py-16">
-        <h2 className="text-2xl font-bold mb-6 text-center">Total de Aportes Aprobados</h2>
+        <h2 className="text-3xl font-extrabold mb-8 text-center text-blue-400 drop-shadow">Aportes Aprobados</h2>
 
         {message && (
           <div
-            className={`mb-4 p-4 rounded-md ${
-              message.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+            className={`mb-4 p-4 rounded-lg text-center font-semibold shadow-lg ${
+              message.type === 'success' ? 'bg-green-600/80 text-white' : 'bg-red-600/80 text-white'
             }`}
           >
             {message.text}
           </div>
         )}
 
-        <div className="mb-4 flex items-center">
-          <FaSearch className="text-gray-400 mr-2" />
+        <div className="mb-8 flex items-center bg-gray-800 rounded-lg px-4 py-2 border border-blue-700 shadow">
+          <FaSearch className="text-blue-300 mr-3 text-xl" />
           <input
             type="text"
-            placeholder="Filtrar por ID de usuario..."
+            placeholder="Filtrar por nombre o ID de usuario..."
             onChange={(e) => handleFiltroChange(e.target.value)}
-            className="w-full bg-gray-700 text-white rounded-md py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-transparent text-white rounded-md py-2 px-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
         </div>
 
         <ul className="space-y-4">
+          {contributionsFiltradas.length === 0 && (
+            <li className="bg-gray-800 p-6 rounded-xl shadow-lg text-center text-blue-200 border border-blue-700">
+              No se encontraron aportes aprobados.
+            </li>
+          )}
           {contributionsFiltradas.map((contribution) => (
-            <li key={contribution._id} className="bg-gray-800 p-4 rounded-md">
-              <h3 className="text-lg font-bold">Usuario ID: {contribution.usuarioId}</h3>
-              <p>Nombre Usuario: {contribution.usuario?.nombre_completo || 'No disponible'}</p>
-              <p>Aporte Aprobado: {contribution.aporte ? 'Sí' : 'No'}</p>
-              {contribution.usuario?.padre && (
-                <>
-                  <br />
-                  <hr />
-                  <br />
-                  <p>ID Padre: {contribution.usuario.padre.id || 'No disponible'}</p>
-                  <p>Nombre Padre: {contribution.usuario.padre.nombre || 'No disponible'}</p>
-                </>
-              )}
+            <li
+              key={contribution._id}
+              className="bg-gradient-to-r from-blue-800 to-blue-600 p-5 rounded-xl shadow-lg border border-blue-700 flex items-center gap-4 hover:scale-[1.01] transition-transform"
+            >
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-700 mr-3">
+                <FaUserCircle className="text-2xl text-blue-200" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-white">
+                  {contribution.usuario?.nombre_completo || 'Usuario no disponible'}
+                </h3>
+                <p className="text-blue-200 font-mono text-sm break-all">
+                  ID: {contribution.usuarioId}
+                </p>
+                <p className="text-xs text-blue-100 mt-1">
+                  Aporte aprobado: <span className="font-bold text-green-300">Sí</span>
+                </p>
+                {contribution.usuario?.padre && (
+                  <div className="mt-2 flex flex-col md:flex-row md:gap-8 gap-1">
+                    <span className="flex items-center gap-2 text-xs text-blue-100">
+                      <FaUserFriends className="text-blue-300" /> ID Padre: <span className="font-mono">{contribution.usuario.padre.id || 'No disponible'}</span>
+                    </span>
+                    <span className="flex items-center gap-2 text-xs text-blue-100">
+                      <FaUserCircle className="text-blue-300" /> Nombre Padre: <span className="font-mono">{contribution.usuario.padre.nombre || 'No disponible'}</span>
+                    </span>
+                  </div>
+                )}
+              </div>
             </li>
           ))}
         </ul>
-
-        {contributionsFiltradas.length === 0 && (
-          <p className="text-gray-400 text-center mt-4">No se encontraron aportes aprobados.</p>
-        )}
       </div>
-      <br /><br />
-
       <AdminNav />
     </div>
   );
