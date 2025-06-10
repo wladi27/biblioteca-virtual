@@ -227,7 +227,7 @@ export const CreatePublication = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Archivo</label>
+              <label className="block text-sm font-medium text-gray-400 mb-2">Archivo o documento</label>
               <input
                 type="file"
                 accept="image/*,video/*,application/pdf"
