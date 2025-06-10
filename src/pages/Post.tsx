@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../components/Modal';
+import { AdminNav } from '../components/AdminNav';
 
 export const CreatePublication = () => {
   const [formData, setFormData] = useState({
@@ -245,6 +246,7 @@ export const CreatePublication = () => {
             </div>
           </form>
         </Modal>
+        <AdminNav/>
       </div>
     </div>
   );
