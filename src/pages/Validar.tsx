@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Background } from '../components/Background';
 import { AdminNav } from '../components/AdminNav';
 import Modal from '../components/Modal';
-import { Trash } from 'lucide-react';
-import debounce from 'lodash/debounce'; // Importación corregida
+import { Trash, CheckCircle } from 'lucide-react';
+import debounce from 'lodash/debounce';
 
 export const Validar = () => {
     const [publicaciones, setPublicaciones] = useState([]);
@@ -85,19 +85,19 @@ export const Validar = () => {
 
     const filteredPublicaciones = useMemo(() => publicacionesSinValidar.filter(pub => {
         const usuarioIdMatch = pub.usuarioId.toString().includes(filter);
-        const nombreMatch = usuarios[pub.usuarioId]?.nombre_completo.toLowerCase().includes(filter.toLowerCase());
+        const nombreMatch = usuarios[pub.usuarioId]?.nombre_completo?.toLowerCase().includes(filter.toLowerCase());
         return usuarioIdMatch || nombreMatch;
     }), [publicacionesSinValidar, filter, usuarios]);
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white">
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-blue-900 text-white">
             <Background />
 
             <div className="max-w-2xl mx-auto px-4 py-16">
-                <h2 className="text-2xl font-bold mb-6 text-center">Aportes Sin Validar</h2>
+                <h2 className="text-3xl font-extrabold mb-8 text-center text-blue-400 drop-shadow">Aportes Sin Validar</h2>
 
                 {message && (
-                    <div className={`mb-4 p-4 rounded-md ${message.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
+                    <div className={`mb-6 p-4 rounded-lg text-center font-semibold shadow-lg ${message.type === 'success' ? 'bg-green-600/80 text-white' : 'bg-red-600/80 text-white'}`}>
                         {message.text}
                     </div>
                 )}
@@ -106,30 +106,48 @@ export const Validar = () => {
                     type="text"
                     placeholder="Filtrar por ID de usuario o nombre"
                     onChange={(e) => handleFilterChange(e.target.value)}
-                    className="w-full mb-4 p-2 rounded-md bg-gray-800 text-white"
+                    className="w-full mb-6 p-3 rounded-lg bg-gray-700 text-white border border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
 
-                <ul className="space-y-4">
+                <ul className="space-y-6">
+                    {filteredPublicaciones.length === 0 && (
+                        <li className="bg-gray-800 p-6 rounded-xl shadow-lg text-center text-blue-200 border border-blue-700">
+                            No hay aportes pendientes de validación.
+                        </li>
+                    )}
                     {filteredPublicaciones.map((pub) => (
-                        <li key={pub._id} className="bg-gray-800 p-4 rounded-md">
-                            <p>ID Usuario: {pub.usuarioId}</p>
-                            <p>Nombre Usuario: {usuarios[pub.usuarioId]?.nombre_completo || 'Usuario no encontrado'}</p>
-                            <p>Status: {pub.aporte ? 'Validado' : 'No Validado'}</p>
-                            <br />
-                            <hr />
-                            <br />
-                            <p>ID Padre: {usuarios[pub.usuarioId]?.padre?.id || 'No disponible'}</p>
-                            <p>Nombre Padre: {usuarios[pub.usuarioId]?.padre?.nombre || 'No disponible'}</p>
-                            <div className="flex justify-between mt-4">
+                        <li key={pub._id} className="bg-gradient-to-r from-blue-800 to-blue-600 p-6 rounded-xl shadow-lg border border-blue-700 flex flex-col gap-2">
+                            <div className="flex items-center gap-4 mb-2">
+                                <div className="flex flex-col">
+                                    <span className="font-bold text-lg text-white">{usuarios[pub.usuarioId]?.nombre_completo || 'Usuario no encontrado'}</span>
+                                    <span className="text-blue-200 font-mono text-sm">@{usuarios[pub.usuarioId]?.nombre_usuario || '---'}</span>
+                                    <span className="text-xs text-blue-100 mt-1">ID: <span className="font-mono">{pub.usuarioId}</span></span>
+                                </div>
+                                <span className="ml-auto px-3 py-1 rounded-full bg-blue-900 text-blue-200 text-xs font-semibold">
+                                    {pub.aporte ? 'Validado' : 'No Validado'}
+                                </span>
+                            </div>
+                            <hr className="border-blue-700 my-2" />
+                            <div className="flex flex-col md:flex-row md:items-center md:gap-8 gap-2">
+                                <div>
+                                    <span className="text-xs text-blue-100">ID Padre: </span>
+                                    <span className="font-mono text-blue-200">{usuarios[pub.usuarioId]?.padre?.id || 'No disponible'}</span>
+                                </div>
+                                <div>
+                                    <span className="text-xs text-blue-100">Nombre Padre: </span>
+                                    <span className="font-mono text-blue-200">{usuarios[pub.usuarioId]?.padre?.nombre || 'No disponible'}</span>
+                                </div>
+                            </div>
+                            <div className="flex gap-4 mt-4">
                                 <button
                                     onClick={() => handleValidate(pub._id)}
-                                    className="bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 transition-colors shadow-md flex items-center"
+                                    className="flex-1 bg-gradient-to-r from-green-600 to-green-500 text-white py-2 px-4 rounded-lg hover:from-green-700 hover:to-green-600 transition-all font-bold shadow-md flex items-center justify-center"
                                 >
-                                    Validar
+                                    <CheckCircle className="mr-2" /> Validar
                                 </button>
                                 <button
                                     onClick={() => handleDelete(pub._id)}
-                                    className="bg-red-500 text-white py-2 px-4 rounded-md hover:bg-red-600 transition-colors shadow-md flex items-center"
+                                    className="flex-1 bg-gradient-to-r from-red-600 to-red-500 text-white py-2 px-4 rounded-lg hover:from-red-700 hover:to-red-600 transition-all font-bold shadow-md flex items-center justify-center"
                                 >
                                     <Trash className="mr-2" /> Eliminar
                                 </button>

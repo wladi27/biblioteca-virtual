@@ -21,10 +21,12 @@ export const CrudComisiones = () => {
     fetchNiveles();
   }, []);
 
-  const fetchNiveles = async () => {
+   const fetchNiveles = async () => {
     const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/niveles/`);
     const data = await response.json();
-    setNiveles(data);
+    // Ordenar del nivel 1 al 12
+    const ordenados = data.sort((a, b) => Number(a.numero_nivel) - Number(b.numero_nivel));
+    setNiveles(ordenados);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,7 +34,7 @@ export const CrudComisiones = () => {
 
     const nivelData = {
       numero_nivel: formData.numero_nivel,
-      comision: { $numberDecimal: formData.comision.toString() }, // Asegúrate de enviar como string
+      comision: { $numberDecimal: formData.comision.toString() },
     };
 
     try {
@@ -67,7 +69,7 @@ export const CrudComisiones = () => {
   const handleEdit = (nivel) => {
     setFormData({
       numero_nivel: nivel.numero_nivel,
-      comision: nivel.comision.$numberDecimal, // Extraer el valor de comision
+      comision: nivel.comision.$numberDecimal,
     });
     setCurrentNivelId(nivel._id);
     setIsEdit(true);
@@ -94,69 +96,78 @@ export const CrudComisiones = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-blue-900 text-white">
       <Background />
-      
-      <div className="max-w-2xl mx-auto px-4 py-16">
-        <h2 className="text-2xl font-bold mb-6 text-center">Lista de Niveles</h2>
-        
+
+      <div className="max-w-3xl mx-auto px-4 py-16">
+        <h2 className="text-3xl font-extrabold mb-8 text-center text-blue-400 drop-shadow">Gestión de Niveles y Comisiones</h2>
+
         {message && (
-          <div className={`mb-4 p-4 rounded-md ${message.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
+          <div className={`mb-6 p-4 rounded-lg text-center font-semibold shadow-lg ${message.type === 'success' ? 'bg-green-600/80 text-white' : 'bg-red-600/80 text-white'}`}>
             {message.text}
           </div>
         )}
 
-        <button
-          onClick={() => { setIsModalOpen(true); setIsEdit(false); }}
-          className="mb-4 bg-blue-600 text-white py-3 px-6 rounded-md hover:bg-blue-700 transition-colors shadow-lg"
-        >
-          Crear Nuevo Nivel
-        </button>
+        <div className="flex justify-end mb-6">
+          <button
+            onClick={() => { setIsModalOpen(true); setIsEdit(false); }}
+            className="bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3 px-6 rounded-lg hover:from-blue-700 hover:to-blue-600 transition-all font-bold shadow-lg"
+          >
+            Crear Nuevo Nivel
+          </button>
+        </div>
 
-        <ul className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {niveles.map((nivel) => (
-            <li key={nivel._id} className="bg-gray-800 p-4 rounded-md">
-              <h3 className="text-lg font-bold">Nivel: {nivel.numero_nivel}</h3>
-              <p>Comisión: {nivel.comision.$numberDecimal}</p>
-              <div className="flex justify-between mt-4">
+            <div key={nivel._id} className="bg-gray-800 rounded-2xl shadow-xl border border-blue-700 p-6 flex flex-col justify-between hover:scale-[1.02] transition-transform">
+              <div>
+                <h3 className="text-xl font-bold text-blue-300 mb-2 flex items-center gap-2">
+                  <span className="text-white">Nivel</span>
+                  <span className="bg-blue-700 text-white px-3 py-1 rounded-full text-lg font-mono">{nivel.numero_nivel}</span>
+                </h3>
+                <p className="text-lg text-blue-200 mb-2">
+                  Comisión: <span className="font-mono text-white">{nivel.comision.$numberDecimal}</span>
+                </p>
+              </div>
+              <div className="flex gap-4 mt-4">
                 <button
                   onClick={() => handleEdit(nivel)}
-                  className="bg-yellow-500 text-white py-2 px-4 rounded-md hover:bg-yellow-600 transition-colors shadow-md flex items-center"
+                  className="flex-1 bg-yellow-500 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors shadow-md flex items-center justify-center font-bold"
                 >
                   <Edit className="mr-2" /> Editar
                 </button>
                 <button
                   onClick={() => handleDelete(nivel._id)}
-                  className="bg-red-500 text-white py-2 px-4 rounded-md hover:bg-red-600 transition-colors shadow-md flex items-center"
+                  className="flex-1 bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors shadow-md flex items-center justify-center font-bold"
                 >
                   <Trash className="mr-2" /> Eliminar
                 </button>
               </div>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
 
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-          <h2 className="text-2xl font-bold mb-6 text-center">{isEdit ? 'Editar Nivel' : 'Crear Nivel'}</h2>
+          <h2 className="text-2xl font-extrabold mb-6 text-center text-blue-400">{isEdit ? 'Editar Nivel' : 'Crear Nivel'}</h2>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Número de Nivel</label>
+              <label className="block text-sm font-semibold text-blue-300 mb-2">Número de Nivel</label>
               <input
                 type="number"
                 required
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 bg-gray-700 border border-blue-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-white"
                 value={formData.numero_nivel}
                 onChange={(e) => setFormData({ ...formData, numero_nivel: e.target.value })}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Comisión</label>
+              <label className="block text-sm font-semibold text-blue-300 mb-2">Comisión</label>
               <input
                 type="number"
                 step="0.01"
                 required
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 bg-gray-700 border border-blue-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-white"
                 value={formData.comision}
                 onChange={(e) => setFormData({ ...formData, comision: e.target.value })}
               />
@@ -165,7 +176,7 @@ export const CrudComisiones = () => {
             <div>
               <button
                 type="submit"
-                className="w-full bg-blue-600 text-white py-3 px-6 rounded-md hover:bg-blue-700 transition-colors shadow-lg"
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3 px-6 rounded-lg hover:from-blue-700 hover:to-blue-600 transition-all font-bold shadow-lg"
               >
                 {isEdit ? 'Actualizar Nivel' : 'Crear Nivel'}
               </button>
@@ -173,8 +184,9 @@ export const CrudComisiones = () => {
           </form>
         </Modal>
       </div>
-      <br /><br />
-      <AdminNav />
+      <div className="mt-20 w-full">
+        <AdminNav />
+      </div>
     </div>
   );
 };

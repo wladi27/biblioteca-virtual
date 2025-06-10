@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Trash } from 'lucide-react';
+import Modal from '../components/Modal';
 import { Background } from '../components/Background';
 import { AdminNav } from '../components/AdminNav';
-import Modal from '../components/Modal';
+import { Edit, Trash } from 'lucide-react';
 
 export const CreatePublication = () => {
   const [formData, setFormData] = useState({
@@ -13,12 +12,11 @@ export const CreatePublication = () => {
     status: 'activo',
   });
 
-  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | null }>(null);
+  const [message, setMessage] = useState(null);
   const [publicaciones, setPublicaciones] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [currentPubId, setCurrentPubId] = useState(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     fetchPublicaciones();
@@ -30,15 +28,15 @@ export const CreatePublication = () => {
     setPublicaciones(data);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setFormData({ ...formData, file: e.target.files[0] });
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     const formDataToSend = new FormData();
     formDataToSend.append('titulo', formData.titulo);
     formDataToSend.append('descripcion', formData.descripcion);
@@ -46,7 +44,7 @@ export const CreatePublication = () => {
     formDataToSend.append('status', formData.status);
 
     try {
-      const response = isEdit 
+      const response = isEdit
         ? await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/publicaciones/${currentPubId}`, {
             method: 'PUT',
             body: formDataToSend,
@@ -58,16 +56,15 @@ export const CreatePublication = () => {
 
       if (response.ok) {
         setMessage({ text: isEdit ? 'Publicación actualizada exitosamente' : 'Publicación creada exitosamente', type: 'success' });
-        fetchPublicaciones(); // Actualiza la lista de publicaciones
-        setIsModalOpen(false); // Cierra el modal
-        setFormData({ titulo: '', descripcion: '', file: null, status: 'activo' }); // Resetea el formulario
-        setIsEdit(false); // Resetea el estado de edición
+        fetchPublicaciones();
+        setIsModalOpen(false);
+        setFormData({ titulo: '', descripcion: '', file: null, status: 'activo' });
+        setIsEdit(false);
       } else {
         const errorData = await response.json();
         setMessage({ text: errorData.message || 'Error al guardar la publicación', type: 'error' });
       }
     } catch (error) {
-      console.error('Error:', error);
       setMessage({ text: 'Error al conectar con el servidor', type: 'error' });
     }
   };
@@ -92,42 +89,47 @@ export const CreatePublication = () => {
 
       if (response.ok) {
         setMessage({ text: 'Publicación eliminada exitosamente', type: 'success' });
-        fetchPublicaciones(); // Actualiza la lista de publicaciones
+        fetchPublicaciones();
       } else {
         const errorData = await response.json();
         setMessage({ text: errorData.message || 'Error al eliminar la publicación', type: 'error' });
       }
     } catch (error) {
-      console.error('Error:', error);
       setMessage({ text: 'Error al conectar con el servidor', type: 'error' });
     }
   };
 
   const renderFile = (file) => {
+    if (!file) return null;
     const fileExtension = file.split('.').pop().toLowerCase();
-    const fileUrl = `${import.meta.env.VITE_URL_LOCAL}/${file}`;
 
-    if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
-      return <img src={fileUrl} alt="Publicación" className="w-full h-auto" />;
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
+      return <img src={file} alt="Publicación" className="w-full h-auto max-h-64 object-contain my-2" />;
     } else if (['mp4', 'webm', 'ogg'].includes(fileExtension)) {
       return (
-        <video controls className="w-full h-auto">
-          <source src={fileUrl} type={`video/${fileExtension}`} />
+        <video controls className="w-full h-auto max-h-64 my-2">
+          <source src={file} type={`video/${fileExtension}`} />
           Tu navegador no soporta la etiqueta de video.
         </video>
       );
+    } else if (['pdf'].includes(fileExtension)) {
+      return (
+        <a href={file} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline my-2 block">
+          Ver PDF
+        </a>
+      );
     } else {
-      return <p>Archivo no soportado</p>;
+      return <p className="my-2">Archivo no soportado</p>;
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <Background />
-      
+
       <div className="max-w-2xl mx-auto px-4 py-16">
         <h2 className="text-2xl font-bold mb-6 text-center">Lista de Publicaciones</h2>
-        
+
         {message && (
           <div className={`mb-4 p-4 rounded-md ${message.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
             {message.text}
@@ -147,7 +149,7 @@ export const CreatePublication = () => {
               <h3 className="text-lg font-bold">{pub.titulo}</h3>
               <p>{pub.descripcion}</p>
               <p>Status: {pub.status}</p>
-              {renderFile(pub.file)} {/* Llama a la función renderFile */}
+              {renderFile(pub.file)}
               <div className="flex justify-between mt-4">
                 <button
                   onClick={() => handleEdit(pub)}
@@ -194,7 +196,7 @@ export const CreatePublication = () => {
               <label className="block text-sm font-medium text-gray-400 mb-2">Archivo</label>
               <input
                 type="file"
-                accept="*/*"
+                accept="image/*,video/*,application/pdf"
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 onChange={handleFileChange}
               />

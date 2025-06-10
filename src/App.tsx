@@ -23,6 +23,7 @@ import WalletApp from './pages/Billetera';
 import { CambiarContrasena } from './pages/Rpass';
 import { RecargarBilletera } from './pages/RecargaAdmin';
 import { DescargarDatosPage } from './pages/DescargarDataPage';
+import { RecargaMasiva } from './pages/RecargaMasiva';
 
 function App() {
   return (
@@ -48,6 +49,7 @@ function App() {
         <Route path="/BV/retiros" element={ <TotalWithdrawals />} />
         <Route path="/BV/comisiones" element={<CrudComisiones />} />
         <Route path="/BV/recarga" element={<RecargarBilletera />} />
+        <Route path="/BV/recarga-masiva" element={<RecargaMasiva />} />
         <Route path="/BV/aportes" element={<TotalApprovedContributions />} />
         <Route path="/BV/descargar-datos" element={<DescargarDatosPage />} />
         <Route path="/BV/restaurar-password" element={<CambiarContrasena />} />

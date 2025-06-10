@@ -15,10 +15,10 @@ export const Home = () => {
         const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/publicaciones`);
         if (response.ok) {
           const data = await response.json();
-          const activePosts = data.filter(post => post.status === 'activo'); // Filtrar solo publicaciones activas
+          const activePosts = data.filter(post => post.status === 'activo');
           setPublicaciones(activePosts);
           if (activePosts.length > 0) {
-            setShowModal(true); // Mostrar modal si hay publicaciones activas
+            setShowModal(true);
           }
         }
       } catch (error) {
@@ -29,18 +29,25 @@ export const Home = () => {
     fetchPublicaciones();
   }, []);
 
+  // Usa la URL pública de Cloudinary directamente
   const renderFile = (file) => {
+    if (!file) return null;
     const fileExtension = file.split('.').pop().toLowerCase();
-    const fileUrl = `${import.meta.env.VITE_URL_LOCAL}/${file}`;
 
-    if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
-      return <img src={fileUrl} alt="Publicación" className="w-full h-auto" />;
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'webm', 'ogg'].includes(fileExtension)) {
+      return <img src={file} alt="Publicación" className="w-full h-auto max-h-64 object-contain my-2 rounded" />;
     } else if (['mp4', 'webm', 'ogg'].includes(fileExtension)) {
       return (
-        <video controls className="w-full h-auto">
-          <source src={fileUrl} type={`video/${fileExtension}`} />
+        <video controls className="w-full h-auto max-h-64 my-2 rounded">
+          <source src={file} type={`video/${fileExtension}`} />
           Tu navegador no soporta la etiqueta de video.
         </video>
+      );
+    } else if (['pdf'].includes(fileExtension)) {
+      return (
+        <a href={file} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline my-2 block">
+          Ver PDF
+        </a>
       );
     } else {
       return <p className="text-gray-400">Archivo no soportado</p>;
@@ -55,11 +62,11 @@ export const Home = () => {
     <div className="min-h-screen bg-gray-900 text-white">
       <Background />
       <Navbar />
-      
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <HeroSection />
         <Features />
-        
+
         <div className="relative py-16">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-700"></div>
@@ -77,7 +84,7 @@ export const Home = () => {
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
             <div className="bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden">
-              <div className="p-6">
+              <div className="p-6 max-h-[80vh] overflow-y-auto">
                 <h2 className="text-2xl font-bold mb-4">Publicaciones Activas</h2>
                 {publicaciones.length > 0 ? (
                   publicaciones.map((post) => (
