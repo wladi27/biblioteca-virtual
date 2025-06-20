@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Home } from './pages/Home';
+{/*import { Home } from './pages/Home';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
@@ -23,13 +23,15 @@ import WalletApp from './pages/Billetera';
 import { CambiarContrasena } from './pages/Rpass';
 import { RecargarBilletera } from './pages/RecargaAdmin';
 import { DescargarDatosPage } from './pages/DescargarDataPage';
-import { RecargaMasiva } from './pages/RecargaMasiva';
+import { RecargaMasiva } from './pages/RecargaMasiva'; */}
+import ServiceSuspendedNotice from './pages/Suspen';
 
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<ServiceSuspendedNotice />} />
+         {/* <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<Dashboard />} />
@@ -52,7 +54,7 @@ function App() {
         <Route path="/BV/recarga-masiva" element={<RecargaMasiva />} />
         <Route path="/BV/aportes" element={<TotalApprovedContributions />} />
         <Route path="/BV/descargar-datos" element={<DescargarDatosPage />} />
-        <Route path="/BV/restaurar-password" element={<CambiarContrasena />} />
+        <Route path="/BV/restaurar-password" element={<CambiarContrasena />} /> */}
 
       </Routes>
     </Router>
