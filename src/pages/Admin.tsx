@@ -68,7 +68,6 @@ export const Admin = () => {
       const usuarioData = await response.json();
       setUsuarioSeleccionado(usuarioData);
       
-      // Obtener la transacción completa y establecerla
       const transaccionData = transacciones.find(t => t._id === transaccionId);
       setTransaccionSeleccionada(transaccionData);
       
@@ -148,7 +147,6 @@ export const Admin = () => {
 
       if (!response.ok) throw new Error('Error al actualizar el estado de la transacción');
 
-      // Actualizar el estado local
       setTransacciones(prevTransacciones =>
         prevTransacciones.map(transaccion =>
           transaccion._id === transaccionSeleccionada._id
@@ -157,7 +155,6 @@ export const Admin = () => {
         )
       );
 
-      // Cerrar el modal
       cerrarModal();
     } catch (error) {
       setError(error.message);
@@ -168,20 +165,14 @@ export const Admin = () => {
     <div className="min-h-screen flex flex-col text-white">
       <Background />
       
-      {/* Contenedor principal */}
       <div className="max-w-7xl mx-auto px-4 py-8 sm:py-12 w-full">
-        {/* Tarjeta principal con fondo semitransparente */}
         <div className="bg-gray-800 bg-opacity-80 rounded-2xl shadow-xl overflow-hidden">
-          {/* Encabezado con gradiente */}
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
             <h1 className="text-3xl font-bold text-center">Administración</h1>
           </div>
 
-          {/* Contenido principal */}
           <div className="p-6">
-            {/* Sección de estadísticas */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {/* Tarjeta de usuarios */}
               <Link to="/BV/usuarios" className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border-l-4 border-blue-400 transition-all hover:shadow-lg">
                 <div className="flex items-center">
                   <div className="p-3 bg-blue-500 rounded-full mr-4">
@@ -194,7 +185,6 @@ export const Admin = () => {
                 </div>
               </Link>
               
-              {/* Tarjeta de códigos creados */}
               <Link to="/BV/codes" className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border-l-4 border-green-400 transition-all hover:shadow-lg">
                 <div className="flex items-center">
                   <div className="p-3 bg-green-500 rounded-full mr-4">
@@ -207,7 +197,6 @@ export const Admin = () => {
                 </div>
               </Link>
 
-              {/* Tarjeta de retiros */}
               <div className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border-l-4 border-purple-400 transition-all hover:shadow-lg">
                 <div className="flex items-center">
                   <div className="p-3 bg-purple-500 rounded-full mr-4">
@@ -220,7 +209,6 @@ export const Admin = () => {
                 </div>
               </div>
 
-              {/* Tarjeta de aportes */}
               <Link to="/BV/aportes" className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border-l-4 border-yellow-400 transition-all hover:shadow-lg">
                 <div className="flex items-center">
                   <div className="p-3 bg-yellow-500 rounded-full mr-4">
@@ -234,7 +222,6 @@ export const Admin = () => {
               </Link>
             </div>
 
-            {/* Sección de retiros */}
             <div className="bg-gray-700 bg-opacity-50 p-6 rounded-xl">
               <h2 className="text-xl font-semibold mb-4 flex items-center">
                 <FaHistory className="mr-2" /> Historial de Retiros
@@ -276,7 +263,8 @@ export const Admin = () => {
                     <tbody className="bg-gray-800 divide-y divide-gray-600">
                       {filtrarTransacciones().map((transaccion) => {
                         const usuario = todosLosUsuarios.find(u => u._id === transaccion.usuario_id);
-                        const estadoColor = transaccion.estado === 'pendiente' ? 'text-green-500' : 'text-red-500';
+                        const estadoColor = transaccion.estado === 'pendiente' ? 'text-yellow-500' : 
+                                         transaccion.estado === 'aprobado' ? 'text-green-500' : 'text-red-500';
 
                         return (
                           <tr key={transaccion._id} className="hover:bg-gray-700 transition-colors">
@@ -311,7 +299,6 @@ export const Admin = () => {
         </div>
       </div>
 
-      {/* Modal para detalles del usuario */}
       {modalVisible && usuarioSeleccionado && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden">
@@ -347,6 +334,10 @@ export const Admin = () => {
                         <p className="text-sm text-gray-400">Fecha</p>
                         <p className="font-medium">{new Date(transaccionSeleccionada.fecha).toLocaleDateString()}</p>
                       </div>
+                      <div>
+                        <p className="text-sm text-gray-400">Estado</p>
+                        <p className="font-medium capitalize">{transaccionSeleccionada.estado}</p>
+                      </div>
                       <div className="col-span-2">
                         <p className="text-sm text-gray-400">Descripción</p>
                         <p className="font-medium">{transaccionSeleccionada.descripcion}</p>
@@ -354,12 +345,61 @@ export const Admin = () => {
                     </div>
                   </div>
 
-                  <button 
-                    onClick={cambiarEstadoTransaccion}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded transition-colors mb-4"
-                  >
-                    Marcar como Aprobado
-                  </button>
+                  {transaccionSeleccionada.estado === 'pendiente' && (
+                    <>
+                      <button 
+                        onClick={cambiarEstadoTransaccion}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded transition-colors mb-2"
+                      >
+                        Marcar como Aprobado
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!transaccionSeleccionada) return;
+                          try {
+                            // 1. Rechazar el retiro
+                            const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${transaccionSeleccionada._id}`, {
+                              method: 'PATCH',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({ estado: 'rechazado' }),
+                            });
+
+                            if (!response.ok) throw new Error('Error al actualizar el estado de la transacción');
+
+                            setTransacciones(prevTransacciones =>
+                              prevTransacciones.map(transaccion =>
+                                transaccion._id === transaccionSeleccionada._id
+                                  ? { ...transaccion, estado: 'rechazado' }
+                                  : transaccion
+                              )
+                            );
+
+                            // 2. Recargar billetera al usuario por el monto del retiro rechazado
+                            await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/recargar`, {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({
+                                monto: transaccionSeleccionada.monto,
+                                usuarioId: transaccionSeleccionada.usuario_id,
+                                descripcion: `Devolución por retiro rechazado (${transaccionSeleccionada._id})`
+                              }),
+                            });
+
+                            cerrarModal();
+                          } catch (error) {
+                            setError(error.message);
+                          }
+                        }}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded transition-colors"
+                      >
+                        Marcar como Rechazado
+                      </button>
+                    </>
+                  )}
                 </>
               )}
 
