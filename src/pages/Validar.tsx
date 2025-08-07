@@ -12,6 +12,11 @@ export const Validar = () => {
     const [filter, setFilter] = useState('');
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | null }>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isValidateModalOpen, setIsValidateModalOpen] = useState(false);
+    const [validateUserId, setValidateUserId] = useState('');
+    const [validateUser, setValidateUser] = useState(null);
+    const [validateLoading, setValidateLoading] = useState(false);
+    const [validateError, setValidateError] = useState('');
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -81,6 +86,54 @@ export const Validar = () => {
         }
     };
 
+    // Buscar usuario por ID
+    const handleSearchUser = async () => {
+        setValidateError('');
+        setValidateUser(null);
+        setValidateLoading(true);
+        try {
+            const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${validateUserId}`);
+            if (!response.ok) {
+                setValidateError('Usuario no encontrado');
+                setValidateLoading(false);
+                return;
+            }
+            const user = await response.json();
+            setValidateUser(user);
+        } catch (e) {
+            setValidateError('Error al buscar usuario');
+        }
+        setValidateLoading(false);
+    };
+
+    // Validar aporte por usuario
+    const handleValidateByUser = async () => {
+        setValidateError('');
+        setValidateLoading(true);
+        try {
+            // POST para crear y validar el aporte
+            const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/aportes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    usuarioId: validateUserId,
+                    aporte: true
+                }),
+            });
+            if (response.ok) {
+                setMessage({ text: 'Aporte validado exitosamente', type: 'success' });
+                setIsValidateModalOpen(false);
+                fetchPublicaciones();
+            } else {
+                const errorData = await response.json();
+                setValidateError(errorData.message || 'Error al validar el aporte');
+            }
+        } catch (e) {
+            setValidateError('Error al conectar con el servidor');
+        }
+        setValidateLoading(false);
+    };
+
     const publicacionesSinValidar = useMemo(() => publicaciones.filter(pub => !pub.aporte), [publicaciones]);
 
     const filteredPublicaciones = useMemo(() => publicacionesSinValidar.filter(pub => {
@@ -88,6 +141,16 @@ export const Validar = () => {
         const nombreMatch = usuarios[pub.usuarioId]?.nombre_completo?.toLowerCase().includes(filter.toLowerCase());
         return usuarioIdMatch || nombreMatch;
     }), [publicacionesSinValidar, filter, usuarios]);
+
+    // Ocultar mensaje después de 3 segundos
+    useEffect(() => {
+        if (message) {
+            const timer = setTimeout(() => {
+                setMessage(null);
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [message]);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-blue-900 text-white">
@@ -101,6 +164,20 @@ export const Validar = () => {
                         {message.text}
                     </div>
                 )}
+
+                {/* Botón para abrir el modal de validación por ID */}
+                <button
+                    className="mb-6 w-full bg-gradient-to-r from-blue-700 to-blue-900 text-white py-3 px-4 rounded-lg font-bold shadow-lg hover:from-blue-800 hover:to-blue-600 transition-all"
+                    onClick={() => {
+                        setIsValidateModalOpen(true);
+                        setValidateUserId('');
+                        setValidateUser(null);
+                        setValidateError('');
+                    }}
+                >
+                    Validar aporte por ID de usuario
+                </button>
+                <br />
 
                 <input
                     type="text"
@@ -155,6 +232,46 @@ export const Validar = () => {
                         </li>
                     ))}
                 </ul>
+
+                
+
+                {/* Modal para validar por ID */}
+                <Modal isOpen={isValidateModalOpen} onClose={() => setIsValidateModalOpen(false)}>
+                    <div className="p-4">
+                        <h3 className="text-xl font-bold mb-4 text-blue-400">Validar aporte por ID de usuario</h3>
+                        <input
+                            type="text"
+                            placeholder="ID de usuario"
+                            value={validateUserId}
+                            onChange={e => setValidateUserId(e.target.value)}
+                            className="w-full mb-3 p-2 rounded bg-gray-700 text-white border border-blue-600"
+                        />
+                        <button
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-bold mb-3"
+                            onClick={handleSearchUser}
+                            disabled={validateLoading || !validateUserId}
+                        >
+                            {validateLoading ? 'Buscando...' : 'Buscar usuario'}
+                        </button>
+                        {validateError && (
+                            <div className="mb-2 text-red-400 font-semibold">{validateError}</div>
+                        )}
+                        {validateUser && (
+                            <div className="mb-4 p-3 rounded bg-blue-900 text-blue-100">
+                                <div><span className="font-bold">Nombre:</span> {validateUser.nombre_completo}</div>
+                                <div><span className="font-bold">Usuario:</span> @{validateUser.nombre_usuario}</div>
+                                <div><span className="font-bold">ID:</span> <span className="font-mono">{validateUser._id}</span></div>
+                                <button
+                                    className="mt-4 w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded font-bold"
+                                    onClick={handleValidateByUser}
+                                    disabled={validateLoading}
+                                >
+                                    {validateLoading ? 'Validando...' : 'Validar aporte'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </Modal>
 
                 <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
                     {/* Contenido del modal para crear o editar publicaciones */}

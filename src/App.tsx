@@ -24,6 +24,7 @@ import { CambiarContrasena } from './pages/Rpass';
 import { RecargarBilletera } from './pages/RecargaAdmin';
 import { DescargarDatosPage } from './pages/DescargarDataPage';
 import { RecargaMasiva } from './pages/RecargaMasiva'; 
+import ReferidosDirectos from './pages/ReferidosDirectos';
 {/* import ServiceSuspendedNotice from './pages/Suspen'; */}
 
 function App() {
@@ -55,6 +56,7 @@ function App() {
         <Route path="/BV/aportes" element={<TotalApprovedContributions />} />
         <Route path="/BV/descargar-datos" element={<DescargarDatosPage />} />
         <Route path="/BV/restaurar-password" element={<CambiarContrasena />} /> 
+        <Route path="/referidos-directos" element={<ReferidosDirectos />} />
 
       </Routes>
     </Router>

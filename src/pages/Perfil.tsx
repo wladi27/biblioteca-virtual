@@ -5,6 +5,7 @@ import { MobileNav } from '../components/MobileNav';
 import { FaUserEdit, FaCode, FaSignOutAlt } from 'react-icons/fa';
 import { Trash2, Clipboard, CheckCircle, Lock, User, Mail, Phone, CreditCard } from 'lucide-react';
 import ChangePasswordModal from '../components/ChangePasswordModal';
+import { FaUserFriends } from 'react-icons/fa'; // Agrega este import
 
 export const Perfil = () => {
   const [userData, setUserData] = useState({});
@@ -285,7 +286,8 @@ export const Perfil = () => {
         </div>
 
         {/* Acciones */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+          {/* Tarjeta de editar perfil */}
           <button 
             onClick={() => setShowUpdateModal(true)}
             className="bg-gray-700 hover:bg-gray-600 p-4 rounded-xl flex items-center gap-3 transition-colors"
@@ -296,6 +298,7 @@ export const Perfil = () => {
             <span>Editar perfil</span>
           </button>
 
+          {/* Tarjeta de códigos de referido */}
           <button 
             onClick={handleGenerateCode}
             className="bg-gray-700 hover:bg-gray-600 p-4 rounded-xl flex items-center gap-3 transition-colors"
@@ -306,6 +309,7 @@ export const Perfil = () => {
             <span>Códigos de referido</span>
           </button>
 
+          {/* Tarjeta de cambiar contraseña */}
           <button 
             onClick={() => setShowChangePasswordModal(true)}
             className="bg-gray-700 hover:bg-gray-600 p-4 rounded-xl flex items-center gap-3 transition-colors"
@@ -315,15 +319,30 @@ export const Perfil = () => {
             </div>
             <span>Cambiar contraseña</span>
           </button>
+
+          {/* Tarjeta de referidos directos */}
+          <button
+            onClick={() => navigate('/referidos-directos')}
+            className="bg-gray-700 hover:bg-gray-600 p-4 rounded-xl flex items-center gap-3 transition-colors"
+          >
+            <div className="bg-pink-500/20 p-3 rounded-full">
+              <FaUserFriends className="h-5 w-5 text-pink-400" />
+            </div>
+            <span>Referidos directos</span>
+          </button>
         </div>
 
-        <button 
-          onClick={() => setShowLogoutModal(true)}
-          className="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 p-4 rounded-xl flex items-center justify-center gap-3 transition-colors"
-        >
-          <FaSignOutAlt className="h-5 w-5" />
-          <span>Cerrar sesión</span>
-        </button>
+        {/* Botón de cerrar sesión SIEMPRE visible y con margen superior */}
+        <div className="mb-8">
+          <button 
+            onClick={() => setShowLogoutModal(true)}
+            className="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 p-4 rounded-xl flex items-center justify-center gap-3 transition-colors"
+          >
+            <FaSignOutAlt className="h-5 w-5" />
+            <span>Cerrar sesión</span>
+          </button>
+          <br /><br /><br />
+        </div>
 
         {/* Modal de edición de perfil */}
         {showUpdateModal && (
@@ -487,6 +506,7 @@ export const Perfil = () => {
 
                 <div className="mt-6 flex justify-end">
                   <button
+                    style={{marginBottom: '20px'}}
                     onClick={() => setShowCodesModal(false)}
                     className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg transition-colors"
                   >
@@ -529,11 +549,12 @@ export const Perfil = () => {
                   <span>Cerrar sesión</span>
                 </button>
               </div>
+              <br /><br />
             </div>
           </div>
         )}
       </div>
-      <br /><br /><br />
+      <br />
 
       <MobileNav />
     </div>
