@@ -34,7 +34,7 @@ export const PerfilAdmin = () => {
     setEditError('');
     setEditUserData(null);
     try {
-      const res = await fetch(`http://localhost:5000/usuarios/${editUserId}`);
+      const res = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${editUserId}`);
       if (!res.ok) throw new Error('Usuario no encontrado');
       const data = await res.json();
       setEditUserData(data);
