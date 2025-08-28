@@ -6,8 +6,8 @@ import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 export const LoginAdmin = () => {
   const navigate = useNavigate();
   const [credentials, setCredentials] = useState({
-    username: '', // Cambiado de nombre_usuario a username
-    password: '', // Cambiado de contraseña a password
+    username: '',
+    password: '',
   });
   const [message, setMessage] = useState({ text: '', type: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -19,8 +19,8 @@ export const LoginAdmin = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: credentials.username, // Cambiado para coincidir con el backend
-          password: credentials.password,   // Cambiado para coincidir con el backend
+          username: credentials.username,
+          password: credentials.password,
         }),
       });
 
@@ -64,8 +64,8 @@ export const LoginAdmin = () => {
                 type="text"
                 required
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={credentials.username} // Cambiado para coincidir con el estado
-                onChange={(e) => setCredentials({ ...credentials, username: e.target.value })} // Cambiado para coincidir con el estado
+                value={credentials.username}
+                onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
               />
             </div>
 
@@ -78,8 +78,8 @@ export const LoginAdmin = () => {
                   type={showPassword ? 'text' : 'password'}
                   required
                   className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={credentials.password} // Cambiado para coincidir con el estado
-                  onChange={(e) => setCredentials({ ...credentials, password: e.target.value })} // Cambiado para coincidir con el estado
+                  value={credentials.password}
+                  onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
                 />
                 <div
                   className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"

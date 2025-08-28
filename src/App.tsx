@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
@@ -25,9 +25,24 @@ import { RecargarBilletera } from './pages/RecargaAdmin';
 import { DescargarDatosPage } from './pages/DescargarDataPage';
 import { RecargaMasiva } from './pages/RecargaMasiva'; 
 import ReferidosDirectos from './pages/ReferidosDirectos';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { initSocket, disconnectSocket } from './socket';
+import { useAuthStore } from './store/authStore';
 {/* import ServiceSuspendedNotice from './pages/Suspen'; */}
 
 function App() {
+  const token = useAuthStore((state) => state.token);
+
+  useEffect(() => {
+    if (token) {
+      initSocket(token);
+    }
+
+    return () => {
+      disconnectSocket();
+    };
+  }, [token]);
+
   return (
     <Router>
       <Routes>
@@ -35,29 +50,31 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/billetera" element={<WalletApp />} />
-        <Route path="/perfil" element={<Perfil/>} />
-        <Route path="/red" element={<Red/>} />
         <Route path="/terminos-y-condiciones" element={<Terminos/>} />
-        <Route path="/comisiones" element={<Comisiones/>} />
         <Route path="/BV/auth/login" element={<LoginAdmin />} />
-        <Route path="/BV/dashboard" element={<Admin />} />
-        <Route path="/BV/red" element={<RedAdmin />} />
-        <Route path="/BV/perfil" element={<PerfilAdmin />} />
-        <Route path="/BV/post" element={<CreatePublication />} />
-        <Route path="/BV/validar" element={<Validar />} />
-        <Route path="/BV/usuarios" element={<TotalUsuarios />} />
-        <Route path="/BV/codes" element={ <TotalReferralCodes />} />
-        <Route path="/BV/retiros" element={ <TotalWithdrawals />} />
-        <Route path="/BV/comisiones" element={<CrudComisiones />} />
-        <Route path="/BV/recarga" element={<RecargarBilletera />} />
-        <Route path="/BV/recarga-masiva" element={<RecargaMasiva />} />
-        <Route path="/BV/aportes" element={<TotalApprovedContributions />} />
-        <Route path="/BV/descargar-datos" element={<DescargarDatosPage />} />
-        <Route path="/BV/restaurar-password" element={<CambiarContrasena />} /> 
-        <Route path="/referidos-directos" element={<ReferidosDirectos />} />
 
+        <Route element={<ProtectedRoute />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/billetera" element={<WalletApp />} />
+          <Route path="/perfil" element={<Perfil/>} />
+          <Route path="/red" element={<Red/>} />
+          <Route path="/comisiones" element={<Comisiones/>} />
+          <Route path="/BV/dashboard" element={<Admin />} />
+          <Route path="/BV/red" element={<RedAdmin />} />
+          <Route path="/BV/perfil" element={<PerfilAdmin />} />
+          <Route path="/BV/post" element={<CreatePublication />} />
+          <Route path="/BV/validar" element={<Validar />} />
+          <Route path="/BV/usuarios" element={<TotalUsuarios />} />
+          <Route path="/BV/codes" element={ <TotalReferralCodes />} />
+          <Route path="/BV/retiros" element={ <TotalWithdrawals />} />
+          <Route path="/BV/comisiones" element={<CrudComisiones />} />
+          <Route path="/BV/recarga" element={<RecargarBilletera />} />
+          <Route path="/BV/recarga-masiva" element={<RecargaMasiva />} />
+          <Route path="/BV/aportes" element={<TotalApprovedContributions />} />
+          <Route path="/BV/descargar-datos" element={<DescargarDatosPage />} />
+          <Route path="/BV/restaurar-password" element={<CambiarContrasena />} /> 
+          <Route path="/referidos-directos" element={<ReferidosDirectos />} />
+        </Route>
       </Routes>
     </Router>
   );
