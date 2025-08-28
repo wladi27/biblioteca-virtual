@@ -52,7 +52,7 @@ export const PerfilAdmin = () => {
     setEditLoading(true);
     setEditError('');
     try {
-      const res = await fetch(`http://localhost:5000/api/usuario/${editUserId}`, {
+      const res = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/usuario/${editUserId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editUserData),

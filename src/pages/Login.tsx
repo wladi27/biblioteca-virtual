@@ -1,18 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Background } from '../components/Background';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { fetchWithAuth } from '../authApi';
+import { useAuthStore } from '../store/authStore'; // Import useAuthStore
 
 export const Login = () => {
   const navigate = useNavigate();
+  const loginUser = useAuthStore((state) => state.login); // Get the login action from the store
   const [credentials, setCredentials] = useState({
     nombre_usuario: '',
     contraseña: '',
   });
-  const [message, setMessage] = useState({ text: '', type: '' }); // Cambiado a un objeto
+  const [message, setMessage] = useState({ text: '', type: '' });
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = async (e) => {
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      // Verify if the token is still valid
+      (async () => {
+        try {
+          await fetchWithAuth(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones`);
+          // If the token is valid, the user already has an active session.
+          // Redirect to dashboard.
+          navigate('/dashboard');
+        } catch (error) {
+          // fetchWithAuth will handle logout if status is 401.
+          // The token is invalid, so we just stay on the login page.
+          // The logout function in fetchWithAuth will have already cleared localStorage.
+        }
+      })();
+    }
+  }, [navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/auth/login`, {
@@ -26,18 +48,16 @@ export const Login = () => {
 
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('usuario', JSON.stringify(data.usuario));
+        loginUser(data.token); // Use the login action from the store
+        localStorage.setItem('usuario', JSON.stringify(data.usuario)); // Keep this for user data
         setMessage({ text: 'Inicio de sesión exitoso. Redirigiendo...', type: 'success' });
-
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 3000);
+        navigate('/dashboard');
       } else {
         const errorData = await response.json();
         setMessage({ text: `Error al iniciar sesión: ${errorData.message || 'Error desconocido'}`, type: 'error' });
       }
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Error:', error);
       setMessage({ text: 'Error al conectar con el servidor', type: 'error' });
     }
