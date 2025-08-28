@@ -6,7 +6,7 @@ export const initSocket = (token: string) => {
   if (ws) {
     ws.close();
   }
-  ws = new WebSocket(`ws://localhost:5000?token=${token}`);
+  ws = new WebSocket(`ws://api-bv.vercel.app?token=${token}`);
 
   ws.onopen = () => {
     console.log('Conectado al servidor de WebSockets');
