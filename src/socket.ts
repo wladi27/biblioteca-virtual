@@ -7,7 +7,7 @@ export const initSocket = (token: string) => {
     ws.close();
   }
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(`${protocol}//api-bv.vercel.app?token=${token}`);
+  ws = new WebSocket(`${protocol}//api-bv-backend-glxpqf-28ec37-72-60-70-200.traefik.me?token=${token}`);
 
   ws.onopen = () => {
     console.log('Conectado al servidor de WebSockets');
