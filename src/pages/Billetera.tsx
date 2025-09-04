@@ -29,20 +29,19 @@ export default function WalletApp() {
   const [busqueda, setBusqueda] = useState("");
   const [showEnviarModal, setShowEnviarModal] = useState(false);
   const [showRetirarModal, setShowRetirarModal] = useState(false);
-  const [moneda, setMoneda] = useState("COP");
   const [tasaCambio, setTasaCambio] = useState(0);
-  const [loadingTasa, setLoadingTasa] = useState(false);
+  const [loadingTasa, setLoadingTasa] = useState(true);
 
   // Función para obtener la tasa de cambio
   const obtenerTasaCambio = async () => {
     setLoadingTasa(true);
     try {
       const response = await fetch(
-        "https://magicloops.dev/api/loop/09e4133a-87a1-44ed-8e9f-03c37efafbf4/run"
+        `${import.meta.env.VITE_URL_LOCAL}/api/dolar`
       );
       if (response.ok) {
         const data = await response.json();
-        setTasaCambio(parseFloat(data.usdToCop));
+        setTasaCambio(data.value);
       }
     } catch (error) {
       console.error("Error al obtener tasa de cambio:", error);
@@ -59,35 +58,13 @@ export default function WalletApp() {
 
   // Formatear el saldo según la moneda seleccionada
   const formatearSaldo = (saldo) => {
-    if (moneda === "USD") {
-      const dolares = convertirADolares(saldo);
-      return dolares.toLocaleString("en-US", {
-        style: "currency",
-        currency: "USD",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-    } else {
-      return saldo.toLocaleString("es-CO", {
-        style: "currency",
-        currency: "COP",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-    }
-  };
-
-  // Alternar entre monedas
-  const cambiarMoneda = () => {
-    if (moneda === "COP") {
-      // Si vamos a mostrar USD, obtener la tasa de cambio si no la tenemos
-      if (tasaCambio === 0) {
-        obtenerTasaCambio();
-      }
-      setMoneda("USD");
-    } else {
-      setMoneda("COP");
-    }
+    const dolares = convertirADolares(saldo);
+    return dolares.toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   };
 
   useEffect(() => {
@@ -98,6 +75,7 @@ export default function WalletApp() {
       verificarBilletera(userData._id);
       obtenerSaldoUsuario(userData._id);
       obtenerHistorialTransacciones(userData._id);
+      obtenerTasaCambio();
     } else {
       setLoading(false);
     }
@@ -310,7 +288,7 @@ export default function WalletApp() {
     });
   };
 
-  if (loading) {
+  if (loading || loadingTasa) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white">
         <div className="text-center">
@@ -399,23 +377,8 @@ export default function WalletApp() {
                       >
                         {formatearSaldo(balance)}
                       </h2>
-                      <button
-                        onClick={cambiarMoneda}
-                        disabled={loadingTasa}
-                        className="flex items-center gap-1 text-sm bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded-md transition-colors"
-                        title={`Mostrar en ${moneda === "COP" ? "USD" : "COP"}`}
-                      >
-                        {loadingTasa ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-3 w-3" />
-                        )}
-                        <span className="text-xs font-mono">
-                          {moneda === "COP" ? "USD" : "COP"}
-                        </span>
-                      </button>
                     </div>
-                    {moneda === "USD" && tasaCambio > 0 && (
+                    {tasaCambio > 0 && (
                       <p className="text-gray-400 text-xs mt-1">
                         Tasa: 1 USD = {tasaCambio.toLocaleString("es-CO")} COP
                       </p>

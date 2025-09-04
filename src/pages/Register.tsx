@@ -294,15 +294,7 @@ export const Register = () => {
             </div>
             {passwordError && <p className="text-red-500 text-sm mt-1">{passwordError}</p>} {/* Mensaje de error de contraseña */}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Código de Referido</label>
-              <input
-                type="text"
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={formData.codigo_referido}
-                onChange={(e) => setFormData({ ...formData, codigo_referido: e.target.value })}
-              />
-            </div>
+          
 
             <div className="md:col-span-2">
               <button
