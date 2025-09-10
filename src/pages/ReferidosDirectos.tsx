@@ -3,8 +3,36 @@ import { Background } from '../components/Background';
 import { FaUserPlus, FaCheck, FaTimes, FaPaperPlane, FaUsers } from 'react-icons/fa';
 import { MobileNav } from '../components/MobileNav';
 import axios from 'axios';
-import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+
+const Message = ({ message, type, onClose }) => {
+  if (!message) return null;
+
+  const baseClasses = 'p-4 rounded-md mb-4 flex justify-between items-center';
+  const typeClasses = {
+    success: 'bg-green-100 border border-green-400 text-green-700',
+    error: 'bg-red-100 border border-red-400 text-red-700',
+  };
+
+  return (
+    <div className={`${baseClasses} ${typeClasses[type]}`}>
+      <span>{message}</span>
+      <button onClick={onClose}>
+        <svg
+          className="w-5 h-5"
+          fill="currentColor"
+          viewBox="0 0 20 20"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            fillRule="evenodd"
+            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+    </div>
+  );
+};
 
 export const ReferidosDirectos = () => {
   const [activeTab, setActiveTab] = useState('recibidas');
@@ -15,6 +43,7 @@ export const ReferidosDirectos = () => {
   const [referidoId, setReferidoId] = useState('');
   const [userId, setUserId] = useState(null);
   const [userData, setUserData] = useState(null);
+  const [message, setMessage] = useState({ text: '', type: '' });
 
   useEffect(() => {
     const usuario = localStorage.getItem('usuario');
@@ -36,7 +65,7 @@ export const ReferidosDirectos = () => {
       setSolicitudesRecibidas(recibidas.data);
       setSolicitudesEnviadas(enviadas.data);
     } catch (error) {
-      toast.error('Error al cargar solicitudes');
+      setMessage({ text: 'Error al cargar solicitudes', type: 'error' });
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -45,38 +74,22 @@ export const ReferidosDirectos = () => {
 
   const handleCambiarEstado = async (solicitudId, nuevoEstado) => {
     try {
-      // 1. Cambiar estado de la solicitud
-      const patchRes = await axios.patch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/${solicitudId}`, 
-        { 
+      await axios.patch(
+        `${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/${solicitudId}`,
+        {
           estado: nuevoEstado,
           usuarioId: userId
         }
       );
 
-      // 2. Si se acepta, hacer recarga al solicitante
-      if (nuevoEstado === 'aceptado') {
-        const solicitanteId = patchRes.data?.solicitud?.solicitante_id || patchRes.data?.solicitante_id;
-        // Si el backend no devuelve el solicitante, búscalo en el array local
-        let idSolicitante = solicitanteId;
-        if (!idSolicitante) {
-          const solicitud = solicitudesRecibidas.find(s => s._id === solicitudId);
-          idSolicitante = solicitud?.solicitante_id?._id || solicitud?.solicitante_id;
-        }
-        if (idSolicitante) {
-          await axios.post(
-            `${import.meta.env.VITE_URL_LOCAL}/api/billetera/recarga-referido`,
-            { usuarioId: idSolicitante }
-          );
-        }
-      }
-
-      toast.success(`Solicitud ${nuevoEstado}`);
+      setMessage({ text: `Solicitud ${nuevoEstado}`, type: 'success' });
       fetchSolicitudes(userId);
+      return true; // Success
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Error al actualizar estado';
-      toast.error(errorMessage);
+      setMessage({ text: errorMessage, type: 'error' });
       console.error('Error al cambiar estado:', error);
+      return false; // Failure
     }
   };
 
@@ -84,12 +97,12 @@ export const ReferidosDirectos = () => {
     e.preventDefault();
     try {
       if (!referidoId) {
-        toast.error('Por favor ingresa un ID de usuario válido');
+        setMessage({ text: 'Por favor ingresa un ID de usuario válido', type: 'error' });
         return;
       }
 
       if (userId === referidoId) {
-        toast.error('No puedes referirte a ti mismo');
+        setMessage({ text: 'No puedes referirte a ti mismo', type: 'error' });
         return;
       }
 
@@ -98,20 +111,24 @@ export const ReferidosDirectos = () => {
         referido_id: referidoId
       });
 
-      toast.success('Solicitud creada exitosamente');
+      setMessage({ text: 'Solicitud creada exitosamente', type: 'success' });
       setShowModal(false);
       setReferidoId('');
       fetchSolicitudes(userId);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Error al crear solicitud');
+      setMessage({ text: error.response?.data?.message || 'Error al crear solicitud', type: 'error' });
       console.error(error);
     }
+  };
+
+  const handleCloseMessage = () => {
+    setMessage({ text: '', type: '' });
   };
 
   return (
     <div className="min-h-screen flex flex-col text-white pb-20">
       <Background />
-      
+
       {/* Contenedor principal */}
       <div className="max-w-4xl mx-auto px-4 py-8 w-full">
         {/* Encabezado con gradiente */}
@@ -123,6 +140,7 @@ export const ReferidosDirectos = () => {
 
         {/* Contenido principal */}
         <div className="bg-gray-800 bg-opacity-80 p-6 rounded-b-xl">
+          <Message message={message.text} type={message.type} onClose={handleCloseMessage} />
           {/* Tabs */}
           <div className="flex border-b border-gray-700 mb-6">
             <button
@@ -155,7 +173,8 @@ export const ReferidosDirectos = () => {
           ) : activeTab === 'recibidas' ? (
             <SolicitudesRecibidas 
               solicitudes={solicitudesRecibidas} 
-              onCambiarEstado={handleCambiarEstado} 
+              onCambiarEstado={handleCambiarEstado}
+              setMessage={setMessage}
             />
           ) : (
             <SolicitudesEnviadas solicitudes={solicitudesEnviadas} />
@@ -208,7 +227,7 @@ export const ReferidosDirectos = () => {
 };
 
 // Componente para mostrar solicitudes recibidas
-const SolicitudesRecibidas = ({ solicitudes, onCambiarEstado }) => {
+const SolicitudesRecibidas = ({ solicitudes, onCambiarEstado, setMessage }) => {
   if (solicitudes.length === 0) {
     return (
       <div className="text-center py-8 bg-gray-700 bg-opacity-50 rounded-lg">
@@ -254,19 +273,41 @@ const SolicitudesRecibidas = ({ solicitudes, onCambiarEstado }) => {
             {solicitud.estado === 'pendiente' && (
               <div className="w-full sm:w-auto flex sm:flex-col gap-2">
                 <button
-                  onClick={() => onCambiarEstado(solicitud._id, 'aceptado')}
-                  className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition-all duration-200 
-                  flex items-center justify-center gap-2 font-medium text-sm sm:text-base
-                  active:scale-95 transform hover:shadow-lg hover:shadow-green-500/20
-                  focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-50"
+                  onClick={async () => {
+                    try {
+                      // Obtener el usuario actual desde localStorage
+                      const usuarioString = localStorage.getItem('usuario');
+                      if (!usuarioString) {
+                        setMessage({ text: 'No se encontró el usuario en localStorage.', type: 'error' });
+                        return;
+                      }
+                      const usuario = JSON.parse(usuarioString);
+                      // Obtener el nivel del usuario que acepta la solicitud
+                      const userResponse = await axios.get(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${usuario._id}`);
+                      const nivel = userResponse.data.nivel;
+                      const solicitanteId = solicitud.solicitante_id?._id || solicitud.solicitante_id;                      
+                      // 1. Cambiar estado de la solicitud
+                      const success = await onCambiarEstado(solicitud._id, 'aceptado');
+                      if (success) {
+                        // 2. Realizar la recarga con el nivel del usuario
+                        await axios.post(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/recarga-referido`, {
+                          usuarioId: solicitanteId, nivel: nivel
+                        });
+                        setMessage({ text: 'Solicitud aceptada y recarga procesada.', type: 'success' });
+                      }
+                    } catch (error) {
+                      console.error('Error al obtener el nivel del usuario:', error);
+                      setMessage({ text: 'Error al aceptar la solicitud.', type: 'error' });
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 font-medium text-sm sm:text-base active:scale-95 transform hover:shadow-lg hover:shadow-green-500/20 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-50"
                 >
                   <FaCheck className="text-lg" />
                   <span className="whitespace-nowrap">Aceptar</span>
                 </button>
                 <button
                   onClick={() => onCambiarEstado(solicitud._id, 'rechazado')}
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition-all duration-200 
-                  flex items-center justify-center gap-2 font-medium text-sm sm:text-base
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 font-medium text-sm sm:text-base
                   active:scale-95 transform hover:shadow-lg hover:shadow-red-500/20
                   focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-50"
                 >
