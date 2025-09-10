@@ -4,6 +4,7 @@ import { Navbar } from '../components/Navbar';
 import { HeroSection } from '../components/HeroSection';
 import { Features } from '../components/Features';
 import { Testimonials } from '../components/Testimonials';
+import { FaYoutube, FaFacebook, FaInstagram, FaTelegram } from 'react-icons/fa';
 
 export const Home = () => {
   const [publicaciones, setPublicaciones] = useState([]);
@@ -75,6 +76,20 @@ export const Home = () => {
             <span className="bg-gray-900 px-4 text-sm text-gray-400">
               Únete a miles de profesionales
             </span>
+          </div>
+        </div>
+
+        <div className="py-16">
+          <h2 className="text-3xl font-bold text-center mb-8">Nuestro Video Explicativo</h2>
+          <div>
+            <iframe
+              src="https://www.youtube.com/embed/t69-8LmKrDk"
+              title="YouTube video player"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="w-full h-[500px] rounded-lg shadow-2xl"
+            ></iframe>
           </div>
         </div>
 
@@ -155,8 +170,22 @@ export const Home = () => {
               </a>
             </div>
           </div>
-          <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-400">
-            <p>Biblioteca Virtual v0.1 © 2024</p>
+          <div className="mt-8 pt-8 border-t border-gray-800 flex flex-col items-center">
+            <div className="flex space-x-6 mb-4">
+              <a href="https://youtube.com/@labibliotecavirtual-oficial" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
+                <FaYoutube size={24} />
+              </a>
+              <a href="https://www.facebook.com/share/1gYpN492ga/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
+                <FaFacebook size={24} />
+              </a>
+              <a href="https://www.instagram.com/?next=%2F" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
+                <FaInstagram size={24} />
+              </a>
+              <a href="https://t.me/bibliovirtua" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
+                <FaTelegram size={24} />
+              </a>
+            </div>
+            <p className="text-gray-400">Biblioteca Virtual v0.1 © 2024</p>
           </div>
         </div>
       </footer>

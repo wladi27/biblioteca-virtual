@@ -84,10 +84,12 @@ export const ReferidosDirectos = () => {
 
       setMessage({ text: `Solicitud ${nuevoEstado}`, type: 'success' });
       fetchSolicitudes(userId);
+      return true; // Success
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Error al actualizar estado';
       setMessage({ text: errorMessage, type: 'error' });
       console.error('Error al cambiar estado:', error);
+      return false; // Failure
     }
   };
 
@@ -285,12 +287,14 @@ const SolicitudesRecibidas = ({ solicitudes, onCambiarEstado, setMessage }) => {
                       const nivel = userResponse.data.nivel;
                       const solicitanteId = solicitud.solicitante_id?._id || solicitud.solicitante_id;                      
                       // 1. Cambiar estado de la solicitud
-                      await onCambiarEstado(solicitud._id, 'aceptado');
-                      // 2. Realizar la recarga con el nivel del usuario
-                      await axios.post(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/recarga-referido`, {
-                        usuarioId: solicitanteId, nivel: nivel
-                      });
-                      setMessage({ text: 'Solicitud aceptada y recarga procesada.', type: 'success' });
+                      const success = await onCambiarEstado(solicitud._id, 'aceptado');
+                      if (success) {
+                        // 2. Realizar la recarga con el nivel del usuario
+                        await axios.post(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/recarga-referido`, {
+                          usuarioId: solicitanteId, nivel: nivel
+                        });
+                        setMessage({ text: 'Solicitud aceptada y recarga procesada.', type: 'success' });
+                      }
                     } catch (error) {
                       console.error('Error al obtener el nivel del usuario:', error);
                       setMessage({ text: 'Error al aceptar la solicitud.', type: 'error' });
