@@ -15,15 +15,25 @@ export const Home = () => {
       try {
         const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/publicaciones`);
         if (response.ok) {
-          const data = await response.json();
-          const activePosts = data.filter(post => post.status === 'activo');
-          setPublicaciones(activePosts);
-          if (activePosts.length > 0) {
-            setShowModal(true);
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            const activePosts = data.filter(post => post.status === 'activo');
+            setPublicaciones(activePosts);
+            if (activePosts.length > 0) {
+              setShowModal(true);
+            }
+          } else {
+            console.warn('Server returned non-JSON response');
+            setPublicaciones([]);
           }
+        } else {
+          console.error('Failed to fetch publicaciones:', response.status, response.statusText);
+          setPublicaciones([]);
         }
       } catch (error) {
         console.error('Error al obtener publicaciones:', error);
+        setPublicaciones([]);
       }
     };
 
