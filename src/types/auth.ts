@@ -16,4 +16,5 @@ export interface RegisterData {
   nombre_usuario: string;
   password: string;
   codigo_referido?: string;
+  pais: string;
 }
