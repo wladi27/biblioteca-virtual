@@ -275,29 +275,46 @@ const SolicitudesRecibidas = ({ solicitudes, onCambiarEstado, setMessage }) => {
                 <button
                   onClick={async () => {
                     try {
-                      // Obtener el usuario actual desde localStorage
                       const usuarioString = localStorage.getItem('usuario');
                       if (!usuarioString) {
                         setMessage({ text: 'No se encontró el usuario en localStorage.', type: 'error' });
                         return;
                       }
-                      const usuario = JSON.parse(usuarioString);
-                      // Obtener el nivel del usuario que acepta la solicitud
-                      const userResponse = await axios.get(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${usuario._id}`);
-                      const nivel = userResponse.data.nivel;
-                      const solicitanteId = solicitud.solicitante_id?._id || solicitud.solicitante_id;                      
+                      const usuario = JSON.parse(usuarioString); // Current user (the one accepting/rejecting)
+
+                      // Determine who is the 'referred' user (the one whose aporte is checked)
+                      // and who is the 'referrer' (the one who gets the recarga)
+                      let referredUserIdForAporte;
+                      let referrerUserIdForRecarga;
+                      let referredUserLevel; // Level of the user who made the aporte
+
+                      if (solicitud.requestType === 'referred_initiated') {
+                        // New flow: referred user (solicitante_id) sent request to sponsor (referido_id)
+                        referredUserIdForAporte = solicitud.solicitante_id?._id || solicitud.solicitante_id;
+                        referrerUserIdForRecarga = solicitud.referido_id?._id || solicitud.referido_id; // Current user (sponsor)
+                      } else {
+                        // Old flow: referrer (solicitante_id) sent request to referred user (referido_id)
+                        referredUserIdForAporte = solicitud.referido_id?._id || solicitud.referido_id;
+                        referrerUserIdForRecarga = solicitud.solicitante_id?._id || solicitud.solicitante_id; // Current user (referrer)
+                      }
+
+                      // Get the level of the referred user (the one whose aporte was checked) and who is the referrer
+                      const referredUserResponse = await axios.get(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${referredUserIdForAporte}`);
+                      referredUserLevel = referredUserResponse.data.nivel;
+                      
                       // 1. Cambiar estado de la solicitud
                       const success = await onCambiarEstado(solicitud._id, 'aceptado');
                       if (success) {
-                        // 2. Realizar la recarga con el nivel del usuario
+                        // 2. Realizar la recarga con el nivel del usuario referido para el referente
                         await axios.post(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/recarga-referido`, {
-                          usuarioId: solicitanteId, nivel: nivel
+                          usuarioId: referrerUserIdForRecarga, // The user who receives the commission
+                          nivel: referredUserLevel // The level of the user who made the aporte
                         });
                         setMessage({ text: 'Solicitud aceptada y recarga procesada.', type: 'success' });
                       }
                     } catch (error) {
-                      console.error('Error al obtener el nivel del usuario:', error);
-                      setMessage({ text: 'Error al aceptar la solicitud.', type: 'error' });
+                      console.error('Error al procesar la solicitud:', error);
+                      setMessage({ text: error.response?.data?.message || 'Error al aceptar la solicitud.', type: 'error' });
                     }
                   }}
                   className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 font-medium text-sm sm:text-base active:scale-95 transform hover:shadow-lg hover:shadow-green-500/20 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-50"
@@ -328,7 +345,7 @@ const SolicitudesEnviadas = ({ solicitudes }) => {
   if (solicitudes.length === 0) {
     return (
       <div className="text-center py-8 bg-gray-700 bg-opacity-50 rounded-lg">
-        <p className="text-gray-400">No has enviado solicitudes de referido.</p>
+        <p className="text-gray-400">No tienes solicitudes recibidas.</p>
       </div>
     );
   }
