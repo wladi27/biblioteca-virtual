@@ -53,7 +53,7 @@ export const Validar = () => {
 
     // Manual search for users
     const handleSearch = async () => {
-        if (searchQuery.length > 2) {
+        if (searchQuery.length > 0) {
             const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/usuarios/search?query=${searchQuery}`);
             const data = await response.json();
             setSearchResults(data);
@@ -320,7 +320,7 @@ export const Validar = () => {
                     </div>
                 )}
 
-                {!selectedUser && (
+                {!selectedUser && searchResults.length === 0 && (
                     <>
                         <h2 className="text-3xl font-extrabold mb-8 text-center text-blue-400 drop-shadow">Aportes Sin Validar</h2>
 
