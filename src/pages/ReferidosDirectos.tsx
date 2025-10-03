@@ -121,6 +121,26 @@ export const ReferidosDirectos = () => {
     }
   };
 
+  const handleAceptarTodas = async () => {
+    try {
+      const response = await axios.post(`${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/aceptar-todas`, { userId });
+      const { resultados } = response.data;
+
+      for (const aceptada of resultados.aceptadas) {
+        await axios.post(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/recarga-referido`, {
+          usuarioId: aceptada.referrerUserId,
+          nivel: aceptada.referredUserLevel
+        });
+      }
+
+      setMessage({ text: response.data.message, type: 'success' });
+      fetchSolicitudes(userId);
+    } catch (error) {
+      setMessage({ text: error.response?.data?.message || 'Error al aceptar todas las solicitudes', type: 'error' });
+      console.error(error);
+    }
+  };
+
   const handleCloseMessage = () => {
     setMessage({ text: '', type: '' });
   };
@@ -158,12 +178,20 @@ export const ReferidosDirectos = () => {
           </div>
 
           {/* Botón para nueva solicitud */}
-          <button
-            onClick={() => setShowModal(true)}
-            className="mb-6 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition duration-200 flex items-center gap-2"
-          >
-            <FaUserPlus /> Nueva Solicitud
-          </button>
+          <div className="flex gap-4 mb-6">
+            <button
+              onClick={() => setShowModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition duration-200 flex items-center gap-2"
+            >
+              <FaUserPlus /> Nueva Solicitud
+            </button>
+            <button
+              onClick={handleAceptarTodas}
+              className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition duration-200 flex items-center gap-2"
+            >
+              <FaCheck /> Aceptar Todas
+            </button>
+          </div>
 
           {/* Contenido de las tabs */}
           {isLoading ? (
