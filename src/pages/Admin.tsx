@@ -24,10 +24,9 @@ export const Admin = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [usuariosResponse, codigosResponse, transaccionesResponse, aportesResponse] = await Promise.all([
+        const [usuariosResponse, codigosResponse, aportesResponse] = await Promise.all([
           fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios`),
           fetch(`${import.meta.env.VITE_URL_LOCAL}/api/referralCodes`),
-          fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/`),
           fetch(`${import.meta.env.VITE_URL_LOCAL}/api/aportes`)
         ]);
 
@@ -40,17 +39,37 @@ export const Admin = () => {
         const codigosData = await codigosResponse.json();
         setTotalCodigosCreados(codigosData.length);
 
-        if (!transaccionesResponse.ok) throw new Error('Error al cargar transacciones');
-        const transaccionesData = await transaccionesResponse.json();
-        const retiros = transaccionesData.filter(t => t.tipo === 'retiro');
-        setTotalRetiros(retiros.length);
-        setTransacciones(retiros);
-
         if (!aportesResponse.ok) throw new Error('Error al cargar aportes');
         const aportesData = await aportesResponse.json();
         setAportes(aportesData);
         const aportesValidados = aportesData.filter(aporte => aporte.aporte);
         setTotalAportesValidados(aportesValidados.length);
+
+        // Fetch transactions with pagination
+        let allRetiros = [];
+        let skip = 0;
+        const limit = 20;
+        let total = 0;
+
+        do {
+          const transaccionesResponse = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones?tipo=retiro&skip=${skip}&limit=${limit}`);
+          if (transaccionesResponse.ok) {
+            const data = await transaccionesResponse.json();
+            if (Array.isArray(data.transacciones)) {
+              allRetiros = [...allRetiros, ...data.transacciones];
+            }
+            total = data.total || 0;
+            skip += limit;
+          } else {
+            console.error('Error al obtener retiros:', transaccionesResponse.statusText);
+            break;
+          }
+        } while (allRetiros.length < total);
+
+        const sortedRetiros = allRetiros.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+        setTotalRetiros(sortedRetiros.length);
+        setTransacciones(sortedRetiros);
+
       } catch (error) {
         setError(error.message);
       } finally {

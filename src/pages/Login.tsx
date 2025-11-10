@@ -21,7 +21,7 @@ export const Login = () => {
       // Verify if the token is still valid
       (async () => {
         try {
-          await fetchWithAuth(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones`);
+          await fetchWithAuth(`${import.meta.env.VITE_URL_LOCAL}/api/referralCodes`);
           // If the token is valid, the user already has an active session.
           // Redirect to dashboard.
           navigate('/dashboard');

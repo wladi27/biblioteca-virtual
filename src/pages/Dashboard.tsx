@@ -30,22 +30,36 @@ export const Dashboard = () => {
 
   const fetchRetiros = async (userId) => {
     setLoadingRetiros(true);
+    let allRetiros = [];
+    let skip = 0;
+    const limit = 20; // O puedes ajustar este valor
+    let total = 0;
+  
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones`);
-      if (response.ok) {
-        const data = await response.json();
-        // Filtrar solo retiros del usuario actual y ordenar por fecha más reciente
-        const userRetiros = data
-          .filter(transaccion => 
-            transaccion.tipo === 'retiro' && transaccion.usuario_id === userId
-          )
-          .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+      do {
+        // Usar `tipo=retiro` para filtrar desde el backend
+        const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${userId}?tipo=retiro&skip=${skip}&limit=${limit}`);
         
-        setRetiros(userRetiros);
-        setFilteredRetiros(userRetiros);
-      } else {
-        console.error('Error al obtener retiros:', response.statusText);
-      }
+        if (response.ok) {
+          const data = await response.json();
+          // Asegurarse de que `data.transacciones` es un array
+          if (Array.isArray(data.transacciones)) {
+            allRetiros = [...allRetiros, ...data.transacciones];
+          }
+          total = data.total || 0;
+          skip += limit;
+        } else {
+          console.error('Error al obtener retiros:', response.statusText);
+          break; // Salir del bucle si hay un error
+        }
+      } while (allRetiros.length < total);
+  
+      // Ordenar los retiros por fecha descendente
+      const sortedRetiros = allRetiros.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+      
+      setRetiros(sortedRetiros);
+      setFilteredRetiros(sortedRetiros);
+  
     } catch (error) {
       console.error('Error:', error);
     } finally {
