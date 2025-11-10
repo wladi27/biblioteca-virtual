@@ -144,7 +144,7 @@ export const RecargarBilletera = () => {
   // Eliminar transacción
   const eliminarTransaccion = async (id) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${id}`, {
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
