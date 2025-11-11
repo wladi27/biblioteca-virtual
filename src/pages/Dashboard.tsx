@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Background } from '../components/Background';
 import { FaDollarSign, FaCode, FaHistory, FaWhatsapp } from 'react-icons/fa';
 import { NivelAlcanzadoComponent } from '../components/NIvelAlcanzado';
@@ -17,41 +17,89 @@ export const Dashboard = () => {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingRetiros, setLoadingRetiros] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalRetiros, setTotalRetiros] = useState(0);
+
+  const LIMIT = 10; // Número de retiros por página
 
   useEffect(() => {
     const usuario = localStorage.getItem('usuario');
     if (usuario) {
       const userData = JSON.parse(usuario);
       setComisiones(userData.comisiones || 0);
-      fetchRetiros(userData._id);
+      fetchRetiros(userData._id, 0, true); // Cargar primera página
       fetchCodigosCreados(userData._id);
     }
   }, []);
 
-  const fetchRetiros = async (userId) => {
-    setLoadingRetiros(true);
+  const fetchRetiros = async (userId, page = 0, isInitialLoad = false) => {
+    if (isInitialLoad) {
+      setLoadingRetiros(true);
+    } else {
+      setLoadingMore(true);
+    }
+
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones`);
+      const skip = page * LIMIT;
+      const response = await fetch(
+        `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/retiros/usuario/${userId}?limit=${LIMIT}&skip=${skip}`
+      );
+      
       if (response.ok) {
         const data = await response.json();
-        // Filtrar solo retiros del usuario actual y ordenar por fecha más reciente
-        const userRetiros = data
-          .filter(transaccion => 
-            transaccion.tipo === 'retiro' && transaccion.usuario_id === userId
-          )
-          .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
         
-        setRetiros(userRetiros);
-        setFilteredRetiros(userRetiros);
+        if (isInitialLoad) {
+          // Carga inicial
+          setRetiros(data);
+          setFilteredRetiros(data);
+          setTotalRetiros(data.length);
+        } else {
+          // Cargar más resultados
+          setRetiros(prev => [...prev, ...data]);
+          setFilteredRetiros(prev => [...prev, ...data]);
+          setTotalRetiros(prev => prev + data.length);
+        }
+
+        // Verificar si hay más resultados
+        setHasMore(data.length === LIMIT);
+        setCurrentPage(page);
+        
       } else {
         console.error('Error al obtener retiros:', response.statusText);
+        if (isInitialLoad) {
+          setRetiros([]);
+          setFilteredRetiros([]);
+        }
       }
     } catch (error) {
       console.error('Error:', error);
+      if (isInitialLoad) {
+        setRetiros([]);
+        setFilteredRetiros([]);
+      }
     } finally {
       setLoadingRetiros(false);
+      setLoadingMore(false);
     }
   };
+
+  // Detectar cuando el usuario llega al final de la lista
+  const handleScroll = useCallback((e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.target;
+    
+    // Verificar si estamos cerca del final (100px antes del final)
+    if (scrollHeight - scrollTop <= clientHeight + 100) {
+      if (!loadingMore && hasMore) {
+        const usuario = localStorage.getItem('usuario');
+        if (usuario) {
+          const userData = JSON.parse(usuario);
+          fetchRetiros(userData._id, currentPage + 1, false);
+        }
+      }
+    }
+  }, [loadingMore, hasMore, currentPage]);
 
   const fetchCodigosCreados = async (userId) => {
     try {
@@ -68,11 +116,22 @@ export const Dashboard = () => {
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     const filtered = retiros.filter(retiro => 
-      retiro.descripcion.toLowerCase().includes(e.target.value.toLowerCase()) ||
-      retiro.monto.toString().includes(e.target.value) ||
-      retiro.estado.toLowerCase().includes(e.target.value.toLowerCase())
+      retiro.descripcion?.toLowerCase().includes(e.target.value.toLowerCase()) ||
+      retiro.monto?.toString().includes(e.target.value) ||
+      retiro.estado?.toLowerCase().includes(e.target.value.toLowerCase())
     );
     setFilteredRetiros(filtered);
+  };
+
+  // Función para cargar más manualmente
+  const loadMoreRetiros = () => {
+    if (!loadingMore && hasMore) {
+      const usuario = localStorage.getItem('usuario');
+      if (usuario) {
+        const userData = JSON.parse(usuario);
+        fetchRetiros(userData._id, currentPage + 1, false);
+      }
+    }
   };
 
   // Resto del código permanece igual...
@@ -182,6 +241,9 @@ export const Dashboard = () => {
             <div className="bg-gray-700 bg-opacity-50 p-6 rounded-xl">
               <h2 className="text-xl font-semibold mb-4 flex items-center">
                 <FaHistory className="mr-2" /> Historial de Retiros
+                <span className="ml-2 text-sm text-gray-300">
+                  ({totalRetiros} retiros)
+                </span>
               </h2>
 
               {/* Campo de búsqueda */}
@@ -193,14 +255,17 @@ export const Dashboard = () => {
                 className="w-full p-2 mb-4 bg-gray-600 rounded-md text-gray-200"
               />
               
-              {loadingRetiros ? (
+              {loadingRetiros && currentPage === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-400">Cargando retiros...</p>
                 </div>
               ) : filteredRetiros.length > 0 ? (
-                <div className="overflow-x-auto">
+                <div 
+                  className="overflow-x-auto max-h-96 overflow-y-auto"
+                  onScroll={handleScroll}
+                >
                   <table className="min-w-full divide-y divide-gray-600">
-                    <thead>
+                    <thead className="bg-gray-800">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Monto</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Descripción</th>
@@ -211,7 +276,7 @@ export const Dashboard = () => {
                     <tbody className="bg-gray-800 divide-y divide-gray-600">
                       {filteredRetiros.map((retiro) => (
                         <tr key={retiro._id} className="hover:bg-gray-700 transition-colors">
-                          <td className="px-4 py-3 whitespace-nowrap text-gray-300">${retiro.monto.toFixed(2)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-gray-300">${retiro.monto?.toFixed(2) || '0.00'}</td>
                           <td className="px-4 py-3 whitespace-nowrap text-gray-300">{retiro.descripcion || 'Sin descripción'}</td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className={`px-2 py-1 rounded-full text-xs ${
@@ -237,6 +302,30 @@ export const Dashboard = () => {
                       ))}
                     </tbody>
                   </table>
+
+                  {/* Indicador de carga y botón para cargar más */}
+                  <div className="mt-4 text-center">
+                    {loadingMore && (
+                      <div className="py-4">
+                        <p className="text-gray-400">Cargando más retiros...</p>
+                      </div>
+                    )}
+                    
+                    {!loadingMore && hasMore && (
+                      <button
+                        onClick={loadMoreRetiros}
+                        className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg transition-colors"
+                      >
+                        Cargar más retiros
+                      </button>
+                    )}
+                    
+                    {!hasMore && filteredRetiros.length > 0 && (
+                      <p className="text-gray-400 py-4">
+                        No hay más retiros para mostrar
+                      </p>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-8">

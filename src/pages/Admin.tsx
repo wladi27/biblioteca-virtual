@@ -1,164 +1,215 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Background } from '../components/Background';
-import { FaHistory, FaUsers, FaCode, FaClipboard, FaDollarSign } from 'react-icons/fa';
+import { FaHistory, FaUsers, FaCode, FaClipboard, FaDollarSign, FaWallet, FaBook, FaSync } from 'react-icons/fa';
 import { AdminNav } from '../components/AdminNav';
 import { Link } from 'react-router-dom';
 
 export const Admin = () => {
   const [totalUsuarios, setTotalUsuarios] = useState(0);
-  const [totalCodigosCreados, setTotalCodigosCreados] = useState(0);
-  const [totalRetiros, setTotalRetiros] = useState(0);
-  const [totalAportesValidados, setTotalAportesValidados] = useState(0);
+  const [totalAportes, setTotalAportes] = useState(0);
+  const [totalReferralCodes, setTotalReferralCodes] = useState(0);
+  const [totalWithdrawals, setTotalWithdrawals] = useState(0);
+  const [totalBilleteras, setTotalBilleteras] = useState(0);
+  const [totalPublicaciones, setTotalPublicaciones] = useState(0);
   const [transacciones, setTransacciones] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const TRANSACTIONS_PER_PAGE = 20;
   const [busqueda, setBusqueda] = useState('');
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [transaccionSeleccionada, setTransaccionSeleccionada] = useState(null);
-  const [usuariosReferidos, setUsuariosReferidos] = useState([]);
-  const [todosLosUsuarios, setTodosLosUsuarios] = useState([]);
-  const [aportes, setAportes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingUsuario, setLoadingUsuario] = useState(false);
   const [error, setError] = useState('');
 
+  // 1. Cargar solo los retiros inmediatamente
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchRetirosIniciales = async () => {
       try {
-        setLoading(true);
-        const [usuariosResponse, codigosResponse, transaccionesResponse, aportesResponse] = await Promise.all([
-          fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios`),
-          fetch(`${import.meta.env.VITE_URL_LOCAL}/api/referralCodes`),
-          fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/`),
-          fetch(`${import.meta.env.VITE_URL_LOCAL}/api/aportes`)
-        ]);
-
-        if (!usuariosResponse.ok) throw new Error('Error al cargar usuarios');
-        const usuariosData = await usuariosResponse.json();
-        setTotalUsuarios(usuariosData.length);
-        setTodosLosUsuarios(usuariosData);
-
-        if (!codigosResponse.ok) throw new Error('Error al cargar códigos');
-        const codigosData = await codigosResponse.json();
-        setTotalCodigosCreados(codigosData.length);
-
-        if (!transaccionesResponse.ok) throw new Error('Error al cargar transacciones');
-        const transaccionesData = await transaccionesResponse.json();
-        const retiros = transaccionesData.filter(t => t.tipo === 'retiro');
-        setTotalRetiros(retiros.length);
-        setTransacciones(retiros);
-
-        if (!aportesResponse.ok) throw new Error('Error al cargar aportes');
-        const aportesData = await aportesResponse.json();
-        setAportes(aportesData);
-        const aportesValidados = aportesData.filter(aporte => aporte.aporte);
-        setTotalAportesValidados(aportesValidados.length);
+        console.log('🚀 Cargando retiros inmediatamente...');
+        
+        const retirosResponse = await fetch(
+          `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/retiros?limit=${TRANSACTIONS_PER_PAGE}&skip=0`
+        );
+        
+        if (retirosResponse.ok) {
+          const retirosData = await retirosResponse.json();
+          setTransacciones(Array.isArray(retirosData) ? retirosData : []);
+          console.log('✅ Retiros cargados:', retirosData.length);
+        }
       } catch (error) {
+        console.error('❌ Error cargando retiros:', error);
         setError(error.message);
-      } finally {
-        setLoading(false);
       }
     };
 
-    fetchData();
+    fetchRetirosIniciales();
   }, []);
 
-  const obtenerDatosUsuario = useCallback(async (usuarioId, transaccionId) => {
+  // 2. Cargar solo el summary (sin usuarios)
+  useEffect(() => {
+    const fetchSummary = async () => {
+      try {
+        console.log('📊 Cargando summary...');
+
+        const summaryResponse = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/summary`);
+        if (summaryResponse.ok) {
+          const summaryData = await summaryResponse.json();
+          setTotalUsuarios(summaryData.totalUsuarios || 0);
+          setTotalAportes(summaryData.totalAportes || 0);
+          setTotalReferralCodes(summaryData.totalReferralCodes || 0);
+          setTotalWithdrawals(summaryData.totalWithdrawals || 0);
+          setTotalBilleteras(summaryData.totalBilleteras || 0);
+          setTotalPublicaciones(summaryData.totalPublicaciones || 0);
+        }
+      } catch (error) {
+        console.error('❌ Error cargando summary:', error);
+      }
+    };
+
+    // Esperar un poco para que primero se muestren los retiros
+    const timer = setTimeout(() => {
+      fetchSummary();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 3. Cargar más retiros cuando sea necesario
+  const loadMoreRetiros = useCallback(async () => {
+    if (!hasMore || loadingMore) return;
+
+    setLoadingMore(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${usuarioId}`);
-      if (!response.ok) throw new Error('Error al obtener los datos del usuario');
-      const usuarioData = await response.json();
-      setUsuarioSeleccionado(usuarioData);
+      const skip = currentPage * TRANSACTIONS_PER_PAGE;
+      const retirosResponse = await fetch(
+        `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/retiros?limit=${TRANSACTIONS_PER_PAGE}&skip=${skip}`
+      );
       
-      const transaccionData = transacciones.find(t => t._id === transaccionId);
-      setTransaccionSeleccionada(transaccionData);
-      
-      await obtenerReferidos(usuarioId);
-      setModalVisible(true);
-    } catch (error) {
-      setError(error.message);
+      if (retirosResponse.ok) {
+        const newRetiros = await retirosResponse.json();
+        const retirosArray = Array.isArray(newRetiros) ? newRetiros : [];
+        
+        setTransacciones(prev => [...prev, ...retirosArray]);
+        setHasMore(retirosArray.length === TRANSACTIONS_PER_PAGE);
+        setCurrentPage(prev => prev + 1);
+      }
+    } catch (err) {
+      console.error('Error cargando más retiros:', err);
+    } finally {
+      setLoadingMore(false);
     }
-  }, [transacciones]);
+  }, [currentPage, hasMore, loadingMore]);
 
-  const obtenerReferidos = async (usuarioId) => {
+  // Observer para scroll infinito
+  const observer = React.useRef();
+  const lastTransactionElementRef = useCallback(node => {
+    if (loadingMore) return;
+    if (observer.current) observer.current.disconnect();
+    
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        loadMoreRetiros();
+      }
+    });
+    
+    if (node) observer.current.observe(node);
+  }, [loadingMore, hasMore, loadMoreRetiros]);
+
+  // Obtener datos del usuario SOLO cuando se abre el modal
+  const obtenerDatosUsuario = useCallback(async (usuarioId, transaccion) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/referralCodes/user/${usuarioId}`);
-      if (!response.ok) throw new Error('Error al obtener los códigos de referido');
-      const codigosData = await response.json();
-      const codigosReferidos = codigosData.map(codigo => codigo.code);
+      setLoadingUsuario(true);
+      console.log('📞 Cargando datos del usuario...', usuarioId);
 
-      if (todosLosUsuarios.length > 0) {
-        const usuariosReferidosFiltrados = todosLosUsuarios.filter(usuario =>
-          codigosReferidos.includes(usuario.codigo_referido)
-        );
+      const [usuarioResponse] = await Promise.all([
+        fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${usuarioId}`)
+      ]);
 
-        const usuariosReferidosConNombres = usuariosReferidosFiltrados.map(usuario => {
-          const aporte = aportes.find(aporte => aporte.usuarioId === usuario._id);
-          return {
-            id: usuario._id,
-            nombre: usuario.nombre_completo,
-            validado: aporte ? aporte.aporte : false
-          };
-        });
-
-        setUsuariosReferidos(usuariosReferidosConNombres);
+      if (usuarioResponse.ok) {
+        const usuarioData = await usuarioResponse.json();
+        setUsuarioSeleccionado(usuarioData);
+        setTransaccionSeleccionada(transaccion);
+        setModalVisible(true);
       } else {
-        setUsuariosReferidos([]);
+        throw new Error('Error al cargar datos del usuario');
       }
     } catch (error) {
-      setError('Error al obtener los referidos');
+      console.error('Error cargando datos del usuario:', error);
+      setError('Error al cargar datos del usuario');
+    } finally {
+      setLoadingUsuario(false);
     }
-  };
+  }, []);
 
-  const filtrarTransacciones = () => {
-    if (!busqueda) return transacciones;
-    return transacciones.filter(transaccion => {
-      const usuario = todosLosUsuarios.find(u => u._id === transaccion.usuario_id);
-      if (!usuario) return false;
-      return (
-        transaccion.usuario_id.toLowerCase().includes(busqueda.toLowerCase()) || 
-        usuario.nombre_completo.toLowerCase().includes(busqueda.toLowerCase())
-      );
-    });
-  };
+  // Filtrar transacciones solo por ID (más rápido)
+  const transaccionesFiltradas = React.useMemo(() => {
+    if (!busqueda.trim()) return transacciones;
+
+    const searchTerm = busqueda.toLowerCase();
+    return transacciones.filter(transaccion => 
+      (transaccion.usuario_id || '').toLowerCase().includes(searchTerm)
+    );
+  }, [busqueda, transacciones]);
 
   const cerrarModal = () => {
     setModalVisible(false);
     setUsuarioSeleccionado(null);
     setTransaccionSeleccionada(null);
-    setUsuariosReferidos([]);
   };
 
   const copiarAlPortapapeles = (texto) => {
-    navigator.clipboard.writeText(texto)
+    if (!texto) return;
+    navigator.clipboard.writeText(texto.toString())
       .then(() => alert('Datos copiados al portapapeles'))
       .catch(err => console.error('Error al copiar:', err));
   };
 
-  const cambiarEstadoTransaccion = async () => {
+  const cambiarEstadoTransaccion = async (nuevoEstado) => {
     if (!transaccionSeleccionada) return;
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${transaccionSeleccionada._id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ estado: 'aprobado' }),
-      });
-
-      if (!response.ok) throw new Error('Error al actualizar el estado de la transacción');
-
-      setTransacciones(prevTransacciones =>
-        prevTransacciones.map(transaccion =>
-          transaccion._id === transaccionSeleccionada._id
-            ? { ...transaccion, estado: 'aprobado' }
-            : transaccion
-        )
+      const response = await fetch(
+        `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${transaccionSeleccionada._id}`, 
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ estado: nuevoEstado }),
+        }
       );
 
-      cerrarModal();
+      if (response.ok) {
+        setTransacciones(prev =>
+          prev.map(t =>
+            t._id === transaccionSeleccionada._id
+              ? { ...t, estado: nuevoEstado }
+              : t
+          )
+        );
+        cerrarModal();
+      }
     } catch (error) {
       setError(error.message);
     }
+  };
+
+  // Función para formatear el estado con colores
+  const getEstadoBadge = (estado) => {
+    const estados = {
+      'pendiente': { color: 'bg-yellow-500 text-yellow-900', texto: 'Pendiente' },
+      'aprobado': { color: 'bg-green-500 text-green-900', texto: 'Aprobado' },
+      'rechazado': { color: 'bg-red-500 text-red-900', texto: 'Rechazado' },
+      'completado': { color: 'bg-blue-500 text-blue-900', texto: 'Completado' }
+    };
+    
+    const estadoConfig = estados[estado] || { color: 'bg-gray-500 text-gray-900', texto: estado };
+    
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${estadoConfig.color}`}>
+        {estadoConfig.texto}
+      </span>
+    );
   };
 
   return (
@@ -172,7 +223,8 @@ export const Admin = () => {
           </div>
 
           <div className="p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {/* Tarjetas de resumen */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
               <Link to="/BV/usuarios" className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border-l-4 border-blue-400 transition-all hover:shadow-lg">
                 <div className="flex items-center">
                   <div className="p-3 bg-blue-500 rounded-full mr-4">
@@ -192,22 +244,12 @@ export const Admin = () => {
                   </div>
                   <div>
                     <h2 className="text-lg font-semibold">Códigos Creados</h2>
-                    <p className="text-2xl font-bold">{totalCodigosCreados}</p>
+                    <p className="text-2xl font-bold">{totalReferralCodes}</p>
                   </div>
                 </div>
               </Link>
 
-              <div className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border-l-4 border-purple-400 transition-all hover:shadow-lg">
-                <div className="flex items-center">
-                  <div className="p-3 bg-purple-500 rounded-full mr-4">
-                    <FaDollarSign className="text-xl" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold">Total Retiros</h2>
-                    <p className="text-2xl font-bold">{totalRetiros}</p>
-                  </div>
-                </div>
-              </div>
+              
 
               <Link to="/BV/aportes" className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border-l-4 border-yellow-400 transition-all hover:shadow-lg">
                 <div className="flex items-center">
@@ -215,13 +257,38 @@ export const Admin = () => {
                     <FaClipboard className="text-xl" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold">Aportes Validados</h2>
-                    <p className="text-2xl font-bold">{totalAportesValidados}</p>
+                    <h2 className="text-lg font-semibold">Total Aportes</h2>
+                    <p className="text-2xl font-bold">{totalAportes}</p>
                   </div>
                 </div>
               </Link>
+
+              <div className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border-l-4 border-pink-400 transition-all hover:shadow-lg">
+                <div className="flex items-center">
+                  <div className="p-3 bg-pink-500 rounded-full mr-4">
+                    <FaWallet className="text-xl" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Total Billeteras</h2>
+                    <p className="text-2xl font-bold">{totalBilleteras}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border-l-4 border-orange-400 transition-all hover:shadow-lg">
+                <div className="flex items-center">
+                  <div className="p-3 bg-orange-500 rounded-full mr-4">
+                    <FaBook className="text-xl" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Total Publicaciones</h2>
+                    <p className="text-2xl font-bold">{totalPublicaciones}</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
+            {/* Tabla de retiros - MUCHO MÁS RÁPIDA */}
             <div className="bg-gray-700 bg-opacity-50 p-6 rounded-xl">
               <h2 className="text-xl font-semibold mb-4 flex items-center">
                 <FaHistory className="mr-2" /> Historial de Retiros
@@ -229,23 +296,25 @@ export const Admin = () => {
               
               <input
                 type="text"
-                placeholder="Buscar por ID o Nombre"
+                placeholder="Buscar por ID de usuario"
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
                 className="mb-4 p-2 rounded bg-gray-600 text-white w-full"
               />
               
-              {loading ? (
+              {transacciones.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-400">Cargando datos...</p>
+                  <p className="text-gray-400">Cargando retiros...</p>
                 </div>
               ) : error ? (
                 <div className="text-center py-8">
                   <p className="text-red-500">{error}</p>
                 </div>
-              ) : transacciones.length === 0 ? (
+              ) : transaccionesFiltradas.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-400">No hay retiros registrados</p>
+                  <p className="text-gray-400">
+                    {busqueda ? 'No se encontraron retiros con ese ID' : 'No hay retiros registrados'}
+                  </p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -253,45 +322,58 @@ export const Admin = () => {
                     <thead>
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">ID Usuario</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Nombre</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Monto</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Descripción</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Estado</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Fecha</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Descripción</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="bg-gray-800 divide-y divide-gray-600">
-                      {filtrarTransacciones().map((transaccion) => {
-                        const usuario = todosLosUsuarios.find(u => u._id === transaccion.usuario_id);
-                        const estadoColor = transaccion.estado === 'pendiente' ? 'text-yellow-500' : 
-                                         transaccion.estado === 'aprobado' ? 'text-green-500' : 'text-red-500';
+                      {transaccionesFiltradas.map((transaccion, index) => {
+                        const isLastItem = index === transaccionesFiltradas.length - 1;
 
                         return (
-                          <tr key={transaccion._id} className="hover:bg-gray-700 transition-colors">
-                            <td className={`px-4 py-3 whitespace-nowrap ${estadoColor}`}>{transaccion.usuario_id}</td>
-                            <td className={`px-4 py-3 whitespace-nowrap ${estadoColor}`}>
-                              {usuario ? usuario.nombre_completo : 'Usuario no encontrado'}
+                          <tr 
+                            key={transaccion._id} 
+                            className="hover:bg-gray-700 transition-colors"
+                            ref={isLastItem ? lastTransactionElementRef : null}
+                          >
+                            <td className="px-4 py-3 whitespace-nowrap text-blue-300 font-mono text-sm">
+                              {transaccion.usuario_id || 'N/A'}
                             </td>
-                            <td className={`px-4 py-3 whitespace-nowrap ${estadoColor}`}>${transaccion.monto}</td>
-                            <td className={`px-4 py-3 whitespace-nowrap ${estadoColor}`}>{transaccion.descripcion}</td>
-                            <td className={`px-4 py-3 whitespace-nowrap ${estadoColor}`}>
-                              {new Date(transaccion.fecha).toLocaleDateString()}
+                            <td className="px-4 py-3 whitespace-nowrap text-green-400 font-semibold">
+                              COP {transaccion.monto ? transaccion.monto.toLocaleString() : 0}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
-                              {usuario && (
-                                <button
-                                  onClick={() => obtenerDatosUsuario(transaccion.usuario_id, transaccion._id)}
-                                  className="bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded text-sm transition-colors"
-                                >
-                                  Ver
-                                </button>
-                              )}
+                              {getEstadoBadge(transaccion.estado)}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-gray-300 text-sm">
+                              {transaccion.fecha ? new Date(transaccion.fecha).toLocaleDateString() : 'N/A'}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-gray-300 text-sm">
+                              {transaccion.descripcion || 'Sin descripción'}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <button
+                                onClick={() => obtenerDatosUsuario(transaccion.usuario_id, transaccion)}
+                                className="bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded text-sm transition-colors"
+                                disabled={loadingUsuario}
+                              >
+                                {loadingUsuario ? 'Cargando...' : 'Ver Usuario'}
+                              </button>
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
+                  
+                  {loadingMore && (
+                    <div className="text-center py-4">
+                      <p className="text-gray-400">Cargando más retiros...</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -299,108 +381,98 @@ export const Admin = () => {
         </div>
       </div>
 
-      {modalVisible && usuarioSeleccionado && (
+      {/* Modal - Solo se carga cuando se necesita */}
+      {modalVisible && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden">
             <div className="p-6 max-h-[80vh] overflow-y-auto">
-              <h2 className="text-2xl font-bold mb-4">Detalles del Usuario</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {['nombre_completo', 'dni', 'linea_llamadas', 'linea_whatsapp', 'banco', 'cuenta_numero', 'titular_cuenta', 'correo_electronico'].map((field, index) => (
-                  <div key={index} className="bg-gray-700 p-3 rounded-lg">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-sm">{field === 'dni' ? 'CC' : field.replace('_', ' ').toUpperCase()}</span>
-                      <FaClipboard 
-                        className="cursor-pointer text-blue-400 hover:text-blue-300"
-                        onClick={() => copiarAlPortapapeles(usuarioSeleccionado[field])}
-                      />
-                    </div>
-                    <p className="font-medium mt-1">{usuarioSeleccionado[field] || 'N/A'}</p>
+              {loadingUsuario ? (
+                <div className="text-center py-8">
+                  <div className="flex items-center justify-center">
+                    <FaSync className="animate-spin text-2xl text-blue-400 mr-2" />
+                    <p className="text-gray-400">Cargando datos del usuario...</p>
                   </div>
-                ))}
-              </div>
-              
-              {transaccionSeleccionada && (
+                </div>
+              ) : usuarioSeleccionado ? (
                 <>
-                  <hr className="border-gray-700 my-4" />
-                  <h3 className="text-xl font-semibold mb-3">Detalles del Retiro</h3>
-                  <div className="bg-gray-700 p-4 rounded-lg mb-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-400">Monto</p>
-                        <p className="font-medium">${transaccionSeleccionada.monto}</p>
+                  <h2 className="text-2xl font-bold mb-4">Detalles del Usuario</h2>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    {['nombre_completo', 'dni', 'linea_llamadas', 'linea_whatsapp', 'banco', 'cuenta_numero', 'titular_cuenta', 'correo_electronico'].map((field, index) => (
+                      <div key={index} className="bg-gray-700 p-3 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 text-sm">
+                            {field === 'dni' ? 'CC' : 
+                             field === 'linea_llamadas' ? 'Teléfono' :
+                             field === 'linea_whatsapp' ? 'WhatsApp' :
+                             field === 'banco' ? 'Banco' :
+                             field === 'cuenta_numero' ? 'N° Cuenta' :
+                             field === 'titular_cuenta' ? 'Titular' :
+                             field === 'correo_electronico' ? 'Correo' :
+                             field.replace('_', ' ').toUpperCase()}
+                          </span>
+                          <FaClipboard 
+                            className="cursor-pointer text-blue-400 hover:text-blue-300"
+                            onClick={() => copiarAlPortapapeles(usuarioSeleccionado[field])}
+                          />
+                        </div>
+                        <p className="font-medium mt-1">{usuarioSeleccionado[field] || 'N/A'}</p>
                       </div>
-                      <div>
-                        <p className="text-sm text-gray-400">Fecha</p>
-                        <p className="font-medium">{new Date(transaccionSeleccionada.fecha).toLocaleDateString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-400">Estado</p>
-                        <p className="font-medium capitalize">{transaccionSeleccionada.estado}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <p className="text-sm text-gray-400">Descripción</p>
-                        <p className="font-medium">{transaccionSeleccionada.descripcion}</p>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-
-                  {transaccionSeleccionada.estado === 'pendiente' && (
+                  
+                  {transaccionSeleccionada && (
                     <>
-                      <button 
-                        onClick={cambiarEstadoTransaccion}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded transition-colors mb-2"
-                      >
-                        Marcar como Aprobado
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (!transaccionSeleccionada) return;
-                          try {
-                            // 1. Rechazar el retiro
-                            const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${transaccionSeleccionada._id}`, {
-                              method: 'PATCH',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              },
-                              body: JSON.stringify({ estado: 'rechazado' }),
-                            });
+                      <hr className="border-gray-700 my-4" />
+                      <h3 className="text-xl font-semibold mb-3">Detalles del Retiro</h3>
+                      <div className="bg-gray-700 p-4 rounded-lg mb-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-400">Monto</p>
+                            <p className="font-medium text-green-400">${transaccionSeleccionada.monto ? transaccionSeleccionada.monto.toLocaleString() : 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-400">Fecha</p>
+                            <p className="font-medium">
+                              {transaccionSeleccionada.fecha ? 
+                                new Date(transaccionSeleccionada.fecha).toLocaleDateString() : 
+                                'N/A'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-400">Estado</p>
+                            <div className="font-medium">{getEstadoBadge(transaccionSeleccionada.estado)}</div>
+                          </div>
+                          <div className="col-span-2">
+                            <p className="text-sm text-gray-400">Descripción</p>
+                            <p className="font-medium">{transaccionSeleccionada.descripcion || 'Sin descripción'}</p>
+                          </div>
+                        </div>
+                      </div>
 
-                            if (!response.ok) throw new Error('Error al actualizar el estado de la transacción');
-
-                            setTransacciones(prevTransacciones =>
-                              prevTransacciones.map(transaccion =>
-                                transaccion._id === transaccionSeleccionada._id
-                                  ? { ...transaccion, estado: 'rechazado' }
-                                  : transaccion
-                              )
-                            );
-
-                            // 2. Recargar billetera al usuario por el monto del retiro rechazado
-                            await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/recargar`, {
-                              method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              },
-                              body: JSON.stringify({
-                                monto: transaccionSeleccionada.monto,
-                                usuarioId: transaccionSeleccionada.usuario_id,
-                                descripcion: `Devolución por retiro rechazado (${transaccionSeleccionada._id})`
-                              }),
-                            });
-
-                            cerrarModal();
-                          } catch (error) {
-                            setError(error.message);
-                          }
-                        }}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded transition-colors"
-                      >
-                        Marcar como Rechazado
-                      </button>
+                      {transaccionSeleccionada.estado === 'pendiente' && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <button 
+                            onClick={() => cambiarEstadoTransaccion('aprobado')}
+                            className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded transition-colors"
+                          >
+                            Aprobar Retiro
+                          </button>
+                          <button
+                            onClick={() => cambiarEstadoTransaccion('rechazado')}
+                            className="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded transition-colors"
+                          >
+                            Rechazar Retiro
+                          </button>
+                        </div>
+                      )}
                     </>
                   )}
                 </>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-red-500">Error al cargar datos del usuario</p>
+                </div>
               )}
 
               <div className="mt-6">
