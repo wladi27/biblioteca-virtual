@@ -20,6 +20,8 @@ export const Register = () => {
     contraseña: '',
     confirmar_contraseña: '',
     codigo_referido: '',
+    patrocinador_id: '', // New field for sponsor ID
+    pais: '',
   });
 
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | null }>(null);

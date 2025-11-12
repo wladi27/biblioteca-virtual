@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Background } from '../components/Background';
 import { AdminNav } from '../components/AdminNav';
 import Modal from '../components/Modal';
-import { Trash, CheckCircle } from 'lucide-react';
+import { Trash, CheckCircle, Search } from 'lucide-react';
 import debounce from 'lodash/debounce';
 
 export const Validar = () => {
@@ -25,6 +25,13 @@ export const Validar = () => {
 
     const observer = useRef();
     const navigate = useNavigate();
+
+    // New state for user search
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [userAportes, setUserAportes] = useState([]);
+    const [loadingUserAportes, setLoadingUserAportes] = useState(false);
 
     useEffect(() => {
         fetchPublicacionesNoValidadas(1, true);
@@ -113,15 +120,38 @@ export const Validar = () => {
         if (node) observer.current.observe(node);
     }, [loadingMore, hasMore, loadMorePublicaciones]);
 
+    // Manual search for users
+    const handleSearch = async () => {
+        if (searchQuery.length > 0) {
+            const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/usuarios/search?query=${searchQuery}`);
+            const data = await response.json();
+            setSearchResults(data);
+        } else {
+            setSearchResults([]);
+        }
+    };
+
+    const handleSelectUser = async (user) => {
+        setSelectedUser(user);
+        setSearchQuery('');
+        setSearchResults([]);
+        setLoadingUserAportes(true);
+        const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/aportes/usuario/${user._id}`);
+        const data = await response.json();
+        setUserAportes(data);
+        setLoadingUserAportes(false);
+    };
+
     const handleValidate = async (id) => {
         try {
-            const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/aportes/${id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ aporte: true }),
-            });
+            const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/aportes/${id}`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ aporte: true }),
+                });
 
             if (response.ok) {
                 setMessage({ text: 'Aporte validado exitosamente', type: 'success' });
@@ -157,13 +187,12 @@ export const Validar = () => {
         }
     };
 
-    // Buscar usuario por ID
     const handleSearchUser = async () => {
         setValidateError('');
         setValidateUser(null);
         setValidateLoading(true);
         try {
-            const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${validateUserId}`);
+            const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/usuarios/${validateUserId}`);
             if (!response.ok) {
                 setValidateError('Usuario no encontrado');
                 setValidateLoading(false);
@@ -177,7 +206,6 @@ export const Validar = () => {
         setValidateLoading(false);
     };
 
-    // Validar aporte por usuario
     const handleValidateByUser = async () => {
         setValidateError('');
         setValidateLoading(true);
@@ -412,7 +440,6 @@ export const Validar = () => {
                     </div>
                 )}
 
-                {/* Modal para validar por ID */}
                 <Modal isOpen={isValidateModalOpen} onClose={() => setIsValidateModalOpen(false)}>
                     <div className="p-4">
                         <h3 className="text-xl font-bold mb-4 text-blue-400">Validar aporte por ID de usuario</h3>

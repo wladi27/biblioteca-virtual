@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { apiGet, apiPost } from "../lib/api";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -32,17 +33,18 @@ export default function WalletApp() {
   const [tasaCambio, setTasaCambio] = useState(0);
   const [loadingTasa, setLoadingTasa] = useState(true);
 
+  // Nuevos estados para la paginación
+  const [paginaActual, setPaginaActual] = useState(1);
+  const [totalTransacciones, setTotalTransacciones] = useState(0);
+  const [transaccionesPorPagina] = useState(20); // O el número que prefieras
+
+
   // Función para obtener la tasa de cambio
   const obtenerTasaCambio = async () => {
     setLoadingTasa(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/dolar`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setTasaCambio(data.value);
-      }
+      const data = await apiGet(`${import.meta.env.VITE_URL_LOCAL}/api/dolar`);
+      if (data && data.value) setTasaCambio(data.value);
     } catch (error) {
       console.error("Error al obtener tasa de cambio:", error);
     } finally {
@@ -74,7 +76,7 @@ export default function WalletApp() {
       setUserId(userData._id);
       verificarBilletera(userData._id);
       obtenerSaldoUsuario(userData._id);
-      obtenerHistorialTransacciones(userData._id);
+      obtenerHistorialTransacciones(userData._id, 1); // Carga la primera página
       obtenerTasaCambio();
     } else {
       setLoading(false);
@@ -83,15 +85,10 @@ export default function WalletApp() {
 
   const verificarBilletera = async (usuarioId) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/billetera/estado/${usuarioId}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setBilleteraActiva(data.activa);
-        if (data.activa) {
-          obtenerDatosBilletera(usuarioId);
-        }
+      const data = await apiGet(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/estado/${usuarioId}`);
+      setBilleteraActiva(data.activa);
+      if (data.activa) {
+        obtenerDatosBilletera(usuarioId);
       }
     } catch (error) {
       console.error("Error:", error);
@@ -102,13 +99,8 @@ export default function WalletApp() {
 
   const obtenerDatosBilletera = async (usuarioId) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/billetera/wallet/${usuarioId}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setWalletId(data._id);
-      }
+      const data = await apiGet(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/wallet/${usuarioId}`);
+      if (data) setWalletId(data._id);
     } catch (error) {
       console.error("Error:", error);
     }
@@ -116,26 +108,24 @@ export default function WalletApp() {
 
   const obtenerSaldoUsuario = async (usuarioId) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/usuarios/saldo/${usuarioId}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setBalance(data.saldo);
-      }
+      const data = await apiGet(`${import.meta.env.VITE_URL_LOCAL}/usuarios/saldo/${usuarioId}`);
+      if (data && typeof data.saldo !== 'undefined') setBalance(data.saldo);
     } catch (error) {
       console.error("Error al obtener el saldo:", error);
     }
   };
 
-  const obtenerHistorialTransacciones = async (usuarioId) => {
+  const obtenerHistorialTransacciones = async (usuarioId, pagina = 1) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${usuarioId}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setHistorial(data);
+      const skip = (pagina - 1) * transaccionesPorPagina;
+      const url = `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${usuarioId}?limit=${transaccionesPorPagina}&skip=${skip}`;
+      const data = await apiGet(url);
+      
+      if (data && data.transacciones) {
+        // Si es la primera página, reemplaza el historial. Si no, añade las nuevas.
+        setHistorial(pagina === 1 ? data.transacciones : [...historial, ...data.transacciones]);
+        setTotalTransacciones(data.total);
+        setPaginaActual(pagina); // Actualiza la página actual
       }
     } catch (error) {
       console.error("Error al obtener el historial de transacciones:", error);
@@ -147,24 +137,11 @@ export default function WalletApp() {
     setError("");
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/billetera/activar`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (response.status === 201) {
-        const userData = JSON.parse(localStorage.getItem("usuario"));
-        setBilleteraActiva(true);
-        obtenerDatosBilletera(userData._id);
-      } else {
-        throw new Error("Error al activar la billetera.");
-      }
+      const data = await apiPost(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/activar`);
+      // Si no hubo error el backend devuelve 201 y la billetera creada
+      const userData = JSON.parse(localStorage.getItem("usuario"));
+      setBilleteraActiva(true);
+      obtenerDatosBilletera(userData._id);
     } catch (error) {
       setError("Error al activar la billetera. Inténtalo de nuevo.");
       console.error("Error al activar la billetera:", error);
@@ -176,29 +153,12 @@ export default function WalletApp() {
   const handleEnviarDinero = async ({ destinatarioId, monto, notas }) => {
     try {
       const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
-      const token = localStorage.getItem("token");
-      
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/enviar`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          destinatario_id: destinatarioId,
-          monto,
-          notas
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.mensaje || "Error al enviar el dinero");
-      }
-
+      await apiPost(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/enviar`, { destinatario_id: destinatarioId, monto, notas });
       await obtenerSaldoUsuario(usuario._id);
-      await obtenerHistorialTransacciones(usuario._id);
+      setPaginaActual(1); // Resetea la paginación
+      await obtenerHistorialTransacciones(usuario._id, 1); // Recarga el historial
     } catch (error) {
+      // Si el helper detecta 401 ya habrá forzado logout
       throw error;
     }
   };
@@ -206,27 +166,10 @@ export default function WalletApp() {
   const handleRetirarDinero = async ({ monto, notas }) => {
     try {
       const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
-      const token = localStorage.getItem("token");
-      
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/retirar`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          monto,
-          notas
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.mensaje || "Error al retirar el dinero");
-      }
-
+      await apiPost(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/retirar`, { monto, notas });
       await obtenerSaldoUsuario(usuario._id);
-      await obtenerHistorialTransacciones(usuario._id);
+      setPaginaActual(1); // Resetea la paginación
+      await obtenerHistorialTransacciones(usuario._id, 1); // Recarga el historial
     } catch (error) {
       throw error;
     }
@@ -522,6 +465,26 @@ export default function WalletApp() {
                   ))
                 )}
               </div>
+
+              {/* Botón para cargar más transacciones */}
+              {historial.length < totalTransacciones && (
+                <div className="mt-6 text-center">
+                  <button
+                    onClick={() => obtenerHistorialTransacciones(userId, paginaActual + 1)}
+                    disabled={loading}
+                    className="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors shadow-md disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Cargando...
+                      </>
+                    ) : (
+                      "Cargar más"
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}
