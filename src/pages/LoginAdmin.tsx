@@ -15,7 +15,7 @@ export const LoginAdmin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/auth/login`, {
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
