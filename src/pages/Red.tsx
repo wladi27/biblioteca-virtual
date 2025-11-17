@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Background } from '../components/Background';
-import { MobileNav } from '../components/MobileNav';
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { User } from 'lucide-react';
-import { NivelAlcanzadoComponent } from '../components/NIvelAlcanzado';
+import { MobileNav } from '../components/MobileNav';
 
 export const Red = () => {
   const [username, setUsername] = useState('');
@@ -13,6 +12,8 @@ export const Red = () => {
   const [openAcordeon, setOpenAcordeon] = useState({});
   const [loading, setLoading] = useState(true);
   const [nivelesOrganizados, setNivelesOrganizados] = useState({});
+  const [loadingNivel, setLoadingNivel] = useState({});
+  const [nivelCache, setNivelCache] = useState({});
 
   useEffect(() => {
     const usuario = localStorage.getItem('usuario');
@@ -21,61 +22,87 @@ export const Red = () => {
       setUsername(userData.nombre_completo);
       setUserId(userData._id);
       setNivelUsuario(userData.nivel || 0);
-      fetchPiramideData(userData._id);
+      
+      // Inicializar niveles vacíos
+      const nivelesVacios = {};
+      for (let i = 1; i <= 12; i++) {
+        nivelesVacios[i] = [];
+      }
+      setNivelesOrganizados(nivelesVacios);
+      setNivelCache({});
+      setOpenAcordeon({});
+      
+      setLoading(false);
     }
   }, []);
 
-  const fetchPiramideData = async (userId) => {
+  const fetchNivelData = async (nivel) => {
+    if (!userId) return;
+
+    // Verificar caché primero
+    const cacheKey = `${userId}-${nivel}`;
+    if (nivelCache[cacheKey]) {
+      setNivelesOrganizados(prev => ({
+        ...prev,
+        [nivel]: nivelCache[cacheKey],
+      }));
+      return;
+    }
+
+    setLoadingNivel(prev => ({ ...prev, [nivel]: true }));
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/piramide-completa/${userId}`);
+      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/piramide-nivel/${userId}/${nivel}`);
       if (response.ok) {
         const data = await response.json();
-        organizarPiramidePorNivel(data.usuarios);
+        
+        setNivelesOrganizados(prev => ({
+          ...prev,
+          [nivel]: data.usuarios,
+        }));
+        
+        // Guardar en caché
+        setNivelCache(prev => ({
+          ...prev,
+          [cacheKey]: data.usuarios
+        }));
+
+        // Recalcular niveles completados
+        setNivelesOrganizados(prev => {
+          const nuevosNiveles = { ...prev, [nivel]: data.usuarios };
+          calcularNivelesCompletados(nuevosNiveles);
+          return nuevosNiveles;
+        });
+        
+      } else {
+        console.error(`Error fetching level ${nivel}`);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error(`Error fetching data for level ${nivel}:`, error);
     } finally {
-      setLoading(false);
+      setLoadingNivel(prev => ({ ...prev, [nivel]: false }));
     }
   };
 
-  const organizarPiramidePorNivel = (usuarios) => {
-    // Ordenar todos los usuarios por su nivel de registro (de menor a mayor)
-    const usuariosOrdenados = [...usuarios].sort((a, b) => a.nivel - b.nivel);
-    
-    // Omitir el primer usuario (raíz)
-    const usuariosSinRaiz = usuariosOrdenados.slice(1); // Eliminar el usuario raíz
-
-    const niveles = {};
-    let indiceUsuario = 0;
-    const totalUsuarios = usuariosSinRaiz.length;
-
-    // Organizar en niveles piramidales (3^1=3, 3^2=9, ...)
-    for (let nivelPiramide = 1; nivelPiramide <= 12; nivelPiramide++) {
-      const cantidadEsperada = Math.pow(3, nivelPiramide);
-      niveles[nivelPiramide] = [];
-
-      // Tomar los siguientes usuarios hasta completar el nivel
-      while (niveles[nivelPiramide].length < cantidadEsperada && indiceUsuario < totalUsuarios) {
-        niveles[nivelPiramide].push(usuariosSinRaiz[indiceUsuario]);
-        indiceUsuario++;
-      }
-    }
-
-    // Calcular niveles completados
+  const calcularNivelesCompletados = (niveles) => {
     let completados = 0;
     for (let nivel = 1; nivel <= 12; nivel++) {
-      if (niveles[nivel].length >= Math.pow(3, nivel)) {
+      const cantidadEsperada = Math.pow(3, nivel);
+      if (niveles[nivel] && niveles[nivel].length >= cantidadEsperada) {
         completados++;
+      } else {
+        break;
       }
     }
-
-    setNivelesOrganizados(niveles);
     setNivelesCompletados(completados);
   };
 
   const toggleAcordeon = (nivel) => {
-    setOpenAcordeon(prev => ({ ...prev, [nivel]: !prev[nivel] }));
+    const isOpening = !openAcordeon[nivel];
+    setOpenAcordeon(prev => ({ ...prev, [nivel]: isOpening }));
+
+    if (isOpening && userId && nivelesOrganizados[nivel]?.length === 0) {
+      fetchNivelData(nivel);
+    }
   };
 
   const renderAcordeon = (nivel) => {
@@ -116,40 +143,54 @@ export const Red = () => {
         
         {openAcordeon[nivel] && (
           <div className="mt-2 pl-10">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {data.map((usuario, index) => (
-                <div 
-                  key={`${usuario._id}-${index}`}
-                  className="p-2 bg-gray-800 rounded flex items-center gap-2 hover:bg-gray-700"
-                >
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                    usuario.nivel <= 5 ? 'bg-blue-500' : 
-                    usuario.nivel <= 10 ? 'bg-purple-500' : 'bg-yellow-500'
-                  }`}>
-                    <span className="text-xs">{usuario.nivel}</span>
+            {loadingNivel[nivel] ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500"></div>
+                <span className="ml-2">Cargando usuarios del nivel {nivel}...</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {data.map((usuario, index) => (
+                  <div 
+                    key={`${usuario._id}-${index}`}
+                    className="p-2 bg-gray-800 rounded flex items-center gap-2 hover:bg-gray-700 transition-colors"
+                  >
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                      usuario.nivel <= 5 ? 'bg-blue-500' : 
+                      usuario.nivel <= 10 ? 'bg-purple-500' : 'bg-yellow-500'
+                    }`}>
+                      <span className="text-xs text-white font-medium">
+                        {usuario.nivel}
+                      </span>
+                    </div>
+                    <div className="truncate flex-1">
+                      <p className="text-sm font-medium">
+                        {usuario.nombre_usuario || `Usuario ${index+1}`}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        ID: {usuario._id?.toString().slice(-4) || 'N/A'}
+                      </p>
+                    </div>
                   </div>
-                  <div className="truncate">
-                    <p className="text-sm">{usuario.nombre_usuario || `Usuario ${index+1}`}</p>
-                    <p className="text-xs text-gray-400">ID: {usuario._id.toString().slice(-4)}</p>
+                ))}
+                
+                {/* Mostrar espacios vacíos para niveles incompletos */}
+                {Array.from({ length: Math.max(0, cantidadEsperada - data.length) }).map((_, index) => (
+                  <div 
+                    key={`empty-${nivel}-${index}`}
+                    className="p-2 bg-gray-800 bg-opacity-30 rounded flex items-center gap-2 border border-dashed border-gray-600"
+                  >
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center bg-gray-700">
+                      <span className="text-xs text-gray-400">-</span>
+                    </div>
+                    <div className="truncate text-gray-500">
+                      <p className="text-sm">Espacio disponible</p>
+                      <p className="text-xs">Vacío</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-              
-              {/* Mostrar espacios vacíos para niveles incompletos */}
-              {Array.from({ length: cantidadEsperada - data.length }).map((_, index) => (
-                <div 
-                  key={`empty-${index}`}
-                  className="p-2 bg-gray-800 bg-opacity-30 rounded flex items-center gap-2"
-                >
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center bg-gray-600">
-                    <span className="text-xs">-</span>
-                  </div>
-                  <div className="truncate text-gray-500">
-                    <p className="text-sm">Vacío</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -183,26 +224,53 @@ export const Red = () => {
               <span>{username}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm bg-blue-500 px-2 py-1 rounded">Nivel: {nivelesCompletados}</span>
+              <span className="text-sm bg-blue-500 px-2 py-1 rounded">Nivel: {nivelUsuario}</span>
             </div>
+          </div>
+          <div className="mt-2">
+            <span className="text-sm text-yellow-500 font-medium">Nota:</span>{' '}
+            <span className="text-sm text-gray-400">
+              Haz clic en cada nivel para cargar y visualizar los usuarios correspondientes.
+            </span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <NivelAlcanzadoComponent nivelActual={nivelesCompletados} />
+          <div className="bg-gradient-to-br from-blue-900 to-blue-700 p-4 rounded-lg">
+            <h3 className="text-blue-200 text-sm mb-2">Tu Progreso</h3>
+            <p className="text-2xl font-bold text-white">
+              {nivelesCompletados} <span className="text-sm font-normal text-blue-200">de 12 niveles completados</span>
+            </p>
+            <div className="w-full bg-blue-800 rounded-full h-3 mt-3">
+              <div 
+                className="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${(nivelesCompletados / 12) * 100}%` }}
+              ></div>
+            </div>
+            <p className="text-xs text-blue-300 mt-2">
+              {nivelesCompletados === 12 ? '¡Red completa!' : `Faltan ${12 - nivelesCompletados} niveles`}
+            </p>
+          </div>
           <div className="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
-            <h3 className="text-gray-400 text-sm">Niveles completados</h3>
-            <p className="text-2xl font-bold">{nivelesCompletados} <span className="text-sm font-normal">de 12</span></p>
+            <h3 className="text-gray-400 text-sm">Información de Red</h3>
+            <p className="text-2xl font-bold text-white">{nivelesCompletados} <span className="text-sm font-normal text-gray-300">niveles</span></p>
+            <p className="text-xs text-gray-400 mt-2">Estructura: 3 → 9 → 27 → 81 → ...</p>
           </div>
         </div>
 
         <div className="space-y-3">
-          <h2 className="text-xl font-semibold mb-3">Estructura de la red</h2>
+          <h2 className="text-xl font-semibold mb-3">Estructura de la Red</h2>
+          <div className="mb-4 p-3 bg-gray-800 rounded-lg">
+            <p className="text-sm text-gray-300">
+              <span className="text-yellow-400">💡</span> Expande cada nivel para ver los usuarios. 
+              Los espacios vacíos están disponibles para nuevos miembros.
+            </p>
+          </div>
           {renderTodosLosNiveles()}
         </div>
       </div>
       <br /><br />
-      <MobileNav />
+     <MobileNav />
     </div>
   );
 };

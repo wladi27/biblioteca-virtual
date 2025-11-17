@@ -9,7 +9,7 @@ import {
   Loader2,
   Filter,
   Search,
-  RefreshCw,
+  Plus,
 } from "lucide-react";
 import { Background } from "../components/Background";
 import { MobileNav } from "../components/MobileNav";
@@ -31,6 +31,10 @@ export default function WalletApp() {
   const [showRetirarModal, setShowRetirarModal] = useState(false);
   const [tasaCambio, setTasaCambio] = useState(0);
   const [loadingTasa, setLoadingTasa] = useState(true);
+  const [pagina, setPagina] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
 
   // Función para obtener la tasa de cambio
   const obtenerTasaCambio = async () => {
@@ -67,6 +71,64 @@ export default function WalletApp() {
     });
   };
 
+  // Función para obtener historial con paginación
+  const obtenerHistorialTransacciones = async (usuarioId, page = 1, isLoadMore = false) => {
+    if (isLoadMore) {
+      setLoadingMore(true);
+    } else {
+      setLoadingHistorial(true);
+    }
+
+    try {
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: '10'
+      });
+
+      // Si hay búsqueda, enviarla al backend
+      if (busqueda) {
+        queryParams.append('search', busqueda);
+      }
+
+      console.log('Obteniendo transacciones - Página:', page, 'Búsqueda:', busqueda);
+
+      const response = await fetch(
+        `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${usuarioId}?${queryParams}`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Datos recibidos - Página:', page, 'HasMore:', data.paginacion.hasMore, 'Total:', data.paginacion.totalTransacciones);
+        
+        if (isLoadMore) {
+          // Agregar nuevas transacciones al historial existente
+          setHistorial(prev => [...prev, ...data.transacciones]);
+        } else {
+          // Reemplazar el historial completo
+          setHistorial(data.transacciones);
+        }
+        
+        setHasMore(data.paginacion.hasMore);
+        setPagina(page);
+      } else {
+        console.error('Error en respuesta:', response.status);
+      }
+    } catch (error) {
+      console.error("Error al obtener el historial de transacciones:", error);
+    } finally {
+      setLoadingHistorial(false);
+      setLoadingMore(false);
+    }
+  };
+
+  // Función para cargar más transacciones
+  const cargarMasTransacciones = () => {
+    if (!loadingMore && hasMore && userId) {
+      console.log('Cargando página:', pagina + 1);
+      obtenerHistorialTransacciones(userId, pagina + 1, true);
+    }
+  };
+
   useEffect(() => {
     const usuario = localStorage.getItem("usuario");
     if (usuario) {
@@ -74,12 +136,23 @@ export default function WalletApp() {
       setUserId(userData._id);
       verificarBilletera(userData._id);
       obtenerSaldoUsuario(userData._id);
-      obtenerHistorialTransacciones(userData._id);
+      obtenerHistorialTransacciones(userData._id, 1, false);
       obtenerTasaCambio();
     } else {
       setLoading(false);
     }
   }, []);
+
+  // Resetear paginación cuando cambian los filtros o búsqueda
+  useEffect(() => {
+    if (userId) {
+      console.log('Filtro o búsqueda cambiada - reseteando paginación');
+      setPagina(1);
+      setHasMore(true);
+      setHistorial([]);
+      obtenerHistorialTransacciones(userId, 1, false);
+    }
+  }, [filtro, busqueda]);
 
   const verificarBilletera = async (usuarioId) => {
     try {
@@ -125,20 +198,6 @@ export default function WalletApp() {
       }
     } catch (error) {
       console.error("Error al obtener el saldo:", error);
-    }
-  };
-
-  const obtenerHistorialTransacciones = async (usuarioId) => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${usuarioId}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setHistorial(data);
-      }
-    } catch (error) {
-      console.error("Error al obtener el historial de transacciones:", error);
     }
   };
 
@@ -197,7 +256,11 @@ export default function WalletApp() {
       }
 
       await obtenerSaldoUsuario(usuario._id);
-      await obtenerHistorialTransacciones(usuario._id);
+      // Recargar historial desde el inicio después de una transacción
+      setPagina(1);
+      setHasMore(true);
+      setHistorial([]);
+      await obtenerHistorialTransacciones(usuario._id, 1, false);
     } catch (error) {
       throw error;
     }
@@ -226,7 +289,11 @@ export default function WalletApp() {
       }
 
       await obtenerSaldoUsuario(usuario._id);
-      await obtenerHistorialTransacciones(usuario._id);
+      // Recargar historial desde el inicio después de una transacción
+      setPagina(1);
+      setHasMore(true);
+      setHistorial([]);
+      await obtenerHistorialTransacciones(usuario._id, 1, false);
     } catch (error) {
       throw error;
     }
@@ -251,8 +318,9 @@ export default function WalletApp() {
     return `${Math.max(2.5 - longitud * 0.1, 1.2)}rem`;
   };
 
+  // Filtrar transacciones localmente solo por tipo (ingresos/gastos)
   const filtrarTransacciones = () => {
-    let transaccionesFiltradas = [...historial];
+    let transaccionesFiltradas = [...(historial || [])];
 
     if (filtro !== "todos") {
       transaccionesFiltradas = transaccionesFiltradas.filter((t) => {
@@ -264,13 +332,6 @@ export default function WalletApp() {
         }
         return true;
       });
-    }
-
-    if (busqueda) {
-      const termino = busqueda.toLowerCase();
-      transaccionesFiltradas = transaccionesFiltradas.filter((t) =>
-        t.descripcion.toLowerCase().includes(termino)
-      );
     }
 
     return transaccionesFiltradas;
@@ -298,6 +359,8 @@ export default function WalletApp() {
       </div>
     );
   }
+
+  const transaccionesFiltradas = filtrarTransacciones();
 
   return (
     <div className="min-h-screen flex flex-col text-white">
@@ -437,7 +500,10 @@ export default function WalletApp() {
                   <ArrowUpRight className="h-5 w-5 text-gray-400" />
                   Historial de transacciones
                 </h3>
-                <div className="relative">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400">
+                    {historial.length} transacciones cargadas
+                  </span>
                   <button
                     onClick={() =>
                       setFiltro(
@@ -471,56 +537,107 @@ export default function WalletApp() {
                   className="w-full bg-gray-700/50 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      setPagina(1);
+                      setHasMore(true);
+                      setHistorial([]);
+                      obtenerHistorialTransacciones(userId, 1, false);
+                    }
+                  }}
                 />
               </div>
 
-              {/* Lista de transacciones - Diseño mejorado */}
-              <div className="space-y-3">
-                {filtrarTransacciones().length === 0 ? (
+              {/* Lista de transacciones */}
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {loadingHistorial && pagina === 1 ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-blue-500" />
+                    <p className="text-gray-400 mt-2">Cargando transacciones...</p>
+                  </div>
+                ) : transaccionesFiltradas.length === 0 ? (
                   <div className="text-center py-8 text-gray-500 bg-gray-700/30 rounded-lg">
                     <p>No se encontraron transacciones</p>
                   </div>
                 ) : (
-                  filtrarTransacciones().map((transaccion) => (
-                    <div
-                      key={transaccion._id}
-                      className="bg-gray-700/50 hover:bg-gray-700/70 rounded-lg p-4 border border-gray-600/30 transition-colors"
-                    >
-                      <div className="flex flex-col">
-                        <h4 className="font-medium">
-                          {transaccion.descripcion}
-                        </h4>
-                        <p className="text-gray-400 text-xs mt-1">
-                          {formatearFecha(transaccion.fecha)} ·{" "}
-                          {formatearHora(transaccion.fecha)}
-                        </p>
-                        <p
-                          className={`font-semibold text-lg ${
-                            transaccion.tipo === "retiro" ||
+                  <>
+                    {transaccionesFiltradas.map((transaccion) => (
+                      <div
+                        key={transaccion._id}
+                        className="bg-gray-700/50 hover:bg-gray-700/70 rounded-lg p-4 border border-gray-600/30 transition-colors"
+                      >
+                        <div className="flex flex-col">
+                          <h4 className="font-medium">
+                            {transaccion.descripcion}
+                          </h4>
+                          <p className="text-gray-400 text-xs mt-1">
+                            {formatearFecha(transaccion.fecha)} ·{" "}
+                            {formatearHora(transaccion.fecha)}
+                          </p>
+                          <p
+                            className={`font-semibold text-lg ${
+                              transaccion.tipo === "retiro" ||
+                              transaccion.tipo === "envio"
+                                ? "text-red-400"
+                                : "text-green-400"
+                            }`}
+                          >
+                            {transaccion.tipo === "retiro" ||
                             transaccion.tipo === "envio"
-                              ? "text-red-400"
-                              : "text-green-400"
-                          }`}
-                        >
-                          {transaccion.tipo === "retiro" ||
-                          transaccion.tipo === "envio"
-                            ? "-"
-                            : "+"}{" "}
-                          COP{" "}
-                          {transaccion.monto.toLocaleString("es-CO", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </p>
+                              ? "-"
+                              : "+"}{" "}
+                            COP{" "}
+                            {transaccion.monto.toLocaleString("es-CO", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </p>
+                        </div>
+                        {transaccion.notas && (
+                          <p className="text-gray-400 text-sm mt-2 italic">
+                            "{transaccion.notas}"
+                          </p>
+                        )}
                       </div>
-                      {transaccion.notas && (
-                        <p className="text-gray-400 text-sm mt-2 italic">
-                          "{transaccion.notas}"
-                        </p>
-                      )}
-                    </div>
-                  ))
+                    ))}
+                  </>
                 )}
+              </div>
+
+              {/* Botón para cargar más transacciones */}
+              {hasMore && historial.length > 0 && (
+                <div className="mt-4 flex justify-center">
+                  <button
+                    onClick={cargarMasTransacciones}
+                    disabled={loadingMore}
+                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Cargando...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4" />
+                        Cargar más transacciones
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Mensaje cuando no hay más transacciones */}
+              {!hasMore && historial.length > 0 && (
+                <div className="mt-4 text-center text-gray-500 text-sm">
+                  No hay más transacciones para mostrar
+                </div>
+              )}
+
+              {/* Información de paginación */}
+              <div className="mt-2 text-center text-xs text-gray-400">
+                Página {pagina} • {historial.length} transacciones cargadas
+                {hasMore && " • Hay más transacciones disponibles"}
               </div>
             </div>
           </>

@@ -44,26 +44,27 @@ export const Dashboard = () => {
     try {
       const skip = page * LIMIT;
       const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/retiros/usuario/${userId}?limit=${LIMIT}&skip=${skip}`
+        `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/retiros/${userId}?limit=${LIMIT}&skip=${skip}`
       );
       
       if (response.ok) {
         const data = await response.json();
         
         if (isInitialLoad) {
-          // Carga inicial
-          setRetiros(data);
-          setFilteredRetiros(data);
-          setTotalRetiros(data.length);
+          // Carga inicial - reemplazar todos los retiros
+          setRetiros(data.retiros || []);
+          setFilteredRetiros(data.retiros || []);
+          setTotalRetiros(data.paginacion?.totalRetiros || 0);
+          setHasMore(data.paginacion?.hasMore || false);
         } else {
-          // Cargar más resultados
-          setRetiros(prev => [...prev, ...data]);
-          setFilteredRetiros(prev => [...prev, ...data]);
-          setTotalRetiros(prev => prev + data.length);
+          // Cargar más resultados - agregar a los existentes
+          const newRetiros = data.retiros || [];
+          setRetiros(prev => [...prev, ...newRetiros]);
+          setFilteredRetiros(prev => [...prev, ...newRetiros]);
+          setTotalRetiros(data.paginacion?.totalRetiros || totalRetiros);
+          setHasMore(data.paginacion?.hasMore || false);
         }
 
-        // Verificar si hay más resultados
-        setHasMore(data.length === LIMIT);
         setCurrentPage(page);
         
       } else {
@@ -71,6 +72,8 @@ export const Dashboard = () => {
         if (isInitialLoad) {
           setRetiros([]);
           setFilteredRetiros([]);
+          setTotalRetiros(0);
+          setHasMore(false);
         }
       }
     } catch (error) {
@@ -78,6 +81,8 @@ export const Dashboard = () => {
       if (isInitialLoad) {
         setRetiros([]);
         setFilteredRetiros([]);
+        setTotalRetiros(0);
+        setHasMore(false);
       }
     } finally {
       setLoadingRetiros(false);
@@ -114,13 +119,21 @@ export const Dashboard = () => {
   };
 
   const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-    const filtered = retiros.filter(retiro => 
-      retiro.descripcion?.toLowerCase().includes(e.target.value.toLowerCase()) ||
-      retiro.monto?.toString().includes(e.target.value) ||
-      retiro.estado?.toLowerCase().includes(e.target.value.toLowerCase())
-    );
-    setFilteredRetiros(filtered);
+    const searchValue = e.target.value;
+    setSearchTerm(searchValue);
+    
+    if (searchValue.trim() === '') {
+      // Si no hay término de búsqueda, mostrar todos los retiros cargados
+      setFilteredRetiros(retiros);
+    } else {
+      // Filtrar los retiros cargados localmente
+      const filtered = retiros.filter(retiro => 
+        retiro.descripcion?.toLowerCase().includes(searchValue.toLowerCase()) ||
+        retiro.monto?.toString().includes(searchValue) ||
+        retiro.estado?.toLowerCase().includes(searchValue.toLowerCase())
+      );
+      setFilteredRetiros(filtered);
+    }
   };
 
   // Función para cargar más manualmente
@@ -242,7 +255,7 @@ export const Dashboard = () => {
               <h2 className="text-xl font-semibold mb-4 flex items-center">
                 <FaHistory className="mr-2" /> Historial de Retiros
                 <span className="ml-2 text-sm text-gray-300">
-                  ({totalRetiros} retiros)
+                  ({filteredRetiros.length} de {totalRetiros} retiros mostrados)
                 </span>
               </h2>
 
@@ -265,7 +278,7 @@ export const Dashboard = () => {
                   onScroll={handleScroll}
                 >
                   <table className="min-w-full divide-y divide-gray-600">
-                    <thead className="bg-gray-800">
+                    <thead className="bg-gray-800 sticky top-0">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Monto</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Descripción</th>
@@ -276,7 +289,7 @@ export const Dashboard = () => {
                     <tbody className="bg-gray-800 divide-y divide-gray-600">
                       {filteredRetiros.map((retiro) => (
                         <tr key={retiro._id} className="hover:bg-gray-700 transition-colors">
-                          <td className="px-4 py-3 whitespace-nowrap text-gray-300">${retiro.monto?.toFixed(2) || '0.00'}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-gray-300">COP {retiro.monto?.toFixed(2) || '0.00'}</td>
                           <td className="px-4 py-3 whitespace-nowrap text-gray-300">{retiro.descripcion || 'Sin descripción'}</td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className={`px-2 py-1 rounded-full text-xs ${

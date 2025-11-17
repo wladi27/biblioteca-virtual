@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AdminNav } from '../components/AdminNav';
 import { PlusCircle, Trash2, Eye, UserCircle2, Search } from 'lucide-react';
 
-const LIMITE = 20;
+const LIMITE = 10;
 
 export const RecargarBilletera = () => {
   // Estado para el formulario de recarga
@@ -13,10 +13,12 @@ export const RecargarBilletera = () => {
 
   // Estado para la lista y filtro de transacciones
   const [transacciones, setTransacciones] = useState([]);
-  const [filtroUsuarioId, setFiltroUsuarioId] = useState(''); // <-- NUEVO ESTADO PARA EL FILTRO
+  const [filtroUsuarioId, setFiltroUsuarioId] = useState('');
   const [loadingTransacciones, setLoadingTransacciones] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [skip, setSkip] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalTransacciones, setTotalTransacciones] = useState(0);
 
   // Estado para UI general
   const [mensaje, setMensaje] = useState('');
@@ -41,55 +43,79 @@ export const RecargarBilletera = () => {
   }, [usuarioId]);
 
   // Obtener transacciones de recarga con paginación y filtro
-  const fetchTransacciones = useCallback(async (reset = false) => {
-    setLoadingTransacciones(true);
-    const currentSkip = reset ? 0 : skip;
+  const fetchTransacciones = useCallback(async (page = 0, isInitialLoad = false) => {
+    if (isInitialLoad) {
+      setLoadingTransacciones(true);
+    } else {
+      setLoadingMore(true);
+    }
+
     try {
-      // <-- LÓGICA DE URL MODIFICADA para usar el estado del filtro
-      const url = filtroUsuarioId
-        ? `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/recargas/${filtroUsuarioId}?limit=${LIMITE}&skip=${currentSkip}`
-        : `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/recargas?limit=${LIMITE}&skip=${currentSkip}`;
+      const skip = page * LIMITE;
+      
+      // Construir URL según si hay filtro o no
+      let url;
+      if (filtroUsuarioId) {
+        url = `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/recargas/${filtroUsuarioId}?limit=${LIMITE}&skip=${skip}`;
+      } else {
+        url = `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/recargas?limit=${LIMITE}&skip=${skip}`;
+      }
+      
+      console.log(`📥 Cargando recargas - Página ${page}, Skip: ${skip}, URL:`, url);
       
       const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
-        if (reset) {
-          setTransacciones(data);
+        console.log('✅ Respuesta del backend:', data);
+        
+        // Manejar tanto el formato antiguo como el nuevo
+        const recargasData = data.recargas || data;
+        const recargasArray = Array.isArray(recargasData) ? recargasData : [];
+        
+        if (isInitialLoad) {
+          setTransacciones(recargasArray);
         } else {
-          setTransacciones(prev => [...prev, ...data]);
+          setTransacciones(prev => [...prev, ...recargasArray]);
         }
-        setSkip(currentSkip + LIMITE);
-        setHasMore(data.length === LIMITE);
+        
+        setHasMore(data.paginacion?.hasMore || (recargasArray.length === LIMITE));
+        setCurrentPage(page);
+        setTotalTransacciones(data.paginacion?.totalRecargas || recargasArray.length);
+        
+        console.log(`✅ Recargas cargadas: ${recargasArray.length}, HasMore: ${data.paginacion?.hasMore || (recargasArray.length === LIMITE)}`);
       } else {
-        setMensaje('Error al obtener transacciones.');
-        setMensajeColor('text-red-400');
+        throw new Error('Error en la respuesta del servidor');
+      }
+    } catch (error) {
+      console.error('❌ Error cargando recargas:', error);
+      setMensaje('Error al obtener transacciones.');
+      setMensajeColor('text-red-400');
+      if (isInitialLoad) {
+        setTransacciones([]);
         setHasMore(false);
       }
-    } catch {
-      setMensaje('Error en la conexión.');
-      setMensajeColor('text-blue-400');
-      setHasMore(false);
     } finally {
       setLoadingTransacciones(false);
+      setLoadingMore(false);
     }
-  }, [filtroUsuarioId, skip]);
+  }, [filtroUsuarioId]);
 
   // Cargar transacciones al montar y cuando cambia el filtro
   useEffect(() => {
-    setSkip(0);
-    fetchTransacciones(true);
-    // eslint-disable-next-line
-  }, [filtroUsuarioId]); // <-- AHORA DEPENDE DEL FILTRO
+    setCurrentPage(0);
+    fetchTransacciones(0, true);
+  }, [filtroUsuarioId]);
 
   // Scroll infinito
   useEffect(() => {
     const handleScroll = () => {
-      if (!listRef.current || loadingTransacciones || !hasMore) return;
+      if (!listRef.current || loadingMore || loadingTransacciones || !hasMore) return;
       const { scrollTop, scrollHeight, clientHeight } = listRef.current;
       if (scrollHeight - scrollTop <= clientHeight + 100) {
-        fetchTransacciones();
+        fetchTransacciones(currentPage + 1, false);
       }
     };
+    
     const refCurrent = listRef.current;
     if (refCurrent) {
       refCurrent.addEventListener('scroll', handleScroll);
@@ -99,7 +125,14 @@ export const RecargarBilletera = () => {
         refCurrent.removeEventListener('scroll', handleScroll);
       }
     };
-  }, [fetchTransacciones, loadingTransacciones, hasMore]);
+  }, [fetchTransacciones, currentPage, loadingMore, loadingTransacciones, hasMore]);
+
+  // Función para cargar más manualmente
+  const loadMoreTransacciones = () => {
+    if (!loadingMore && hasMore) {
+      fetchTransacciones(currentPage + 1, false);
+    }
+  };
 
   // Validación y recarga
   const handleSubmit = async (e) => {
@@ -128,8 +161,8 @@ export const RecargarBilletera = () => {
         setMensajeColor('text-green-400');
         setMonto('');
         // Refrescar la lista de transacciones después de una recarga exitosa
-        setSkip(0);
-        fetchTransacciones(true);
+        setCurrentPage(0);
+        fetchTransacciones(0, true);
       } else {
         const errorData = await response.json();
         setMensaje(`Error: ${errorData.message || 'No se pudo recargar la billetera.'}`);
@@ -151,8 +184,8 @@ export const RecargarBilletera = () => {
         setMensaje('Transacción eliminada correctamente.');
         setMensajeColor('text-green-400');
         // Refrescar la lista
-        setSkip(0);
-        fetchTransacciones(true);
+        setCurrentPage(0);
+        fetchTransacciones(0, true);
       } else {
         const errorData = await response.json();
         setMensaje(`Error: ${errorData.message}`);
@@ -172,6 +205,24 @@ export const RecargarBilletera = () => {
   const handleCloseModal = () => {
     setModalVisible(false);
     setTransaccionSeleccionada(null);
+  };
+
+  // Función para obtener el ID del usuario de diferentes formas
+  const getUsuarioId = (transaccion) => {
+    if (!transaccion || !transaccion.usuario_id) return 'N/A';
+    
+    if (typeof transaccion.usuario_id === 'object') {
+      return transaccion.usuario_id._id || 'N/A';
+    }
+    return transaccion.usuario_id || 'N/A';
+  };
+
+  // Función para obtener el nombre del usuario si está disponible
+  const getUsuarioNombre = (transaccion) => {
+    if (typeof transaccion.usuario_id === 'object') {
+      return transaccion.usuario_id.nombre || 'N/A';
+    }
+    return 'N/A';
   };
 
   return (
@@ -226,9 +277,14 @@ export const RecargarBilletera = () => {
 
       {/* SECCIÓN DE LISTA Y FILTRO */}
       <div className="w-full max-w-lg mt-12">
-        <h2 className="text-2xl font-bold text-center text-blue-300 drop-shadow">Transacciones de Recarga</h2>
+        <h2 className="text-2xl font-bold text-center text-blue-300 drop-shadow">
+          Transacciones de Recarga
+          <span className="ml-2 text-sm text-gray-300">
+            ({transacciones.length} de {totalTransacciones} recargas cargadas)
+          </span>
+        </h2>
         
-        {/* <-- NUEVO INPUT PARA FILTRAR --> */}
+        {/* Input para filtrar */}
         <div className="mt-4 mb-4 relative">
           <label htmlFor="filtroUsuario" className="sr-only">Filtrar por ID de Usuario</label>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5"/>
@@ -256,34 +312,69 @@ export const RecargarBilletera = () => {
                   {filtroUsuarioId ? 'No se encontraron recargas para este usuario.' : 'No hay transacciones de recarga.'}
                 </li>
               ) : (
-                transacciones.map(transaccion => (
-                  <li key={transaccion._id} className="flex justify-between items-center p-4 hover:bg-blue-900/30 transition-colors">
-                    <div className="flex-1 overflow-hidden">
-                      <p className="font-semibold text-blue-200 truncate">{transaccion.descripcion}</p>
-                      {/* <-- ID DEL USUARIO AHORA VISIBLE EN LA LISTA --> */}
-                      <p className="text-sm text-gray-400 font-mono break-words">ID Usuario: {transaccion.usuario_id}</p>
-                      <p className="text-xs text-gray-500 mt-1">{new Date(transaccion.fecha).toLocaleString()}</p>
-                    </div>
-                    <div className="flex items-center ml-4">
-                      <button onClick={() => handleOpenModal(transaccion)} className="text-green-400 hover:text-green-300 mr-2 transition">
-                        <Eye className="w-5 h-5" />
-                      </button>
-                      <button onClick={() => eliminarTransaccion(transaccion._id)} className="text-red-400 hover:text-red-300 transition">
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </li>
-                ))
+                transacciones.map((transaccion, index) => {
+                  const isLastItem = index === transacciones.length - 1;
+                  const usuarioId = getUsuarioId(transaccion);
+
+                  return (
+                    <li 
+                      key={transaccion._id} 
+                      className="flex justify-between items-center p-4 hover:bg-blue-900/30 transition-colors"
+                    >
+                      <div className="flex-1 overflow-hidden">
+                        <p className="font-semibold text-blue-200 truncate">{transaccion.descripcion}</p>
+                        <p className="text-sm text-gray-400 font-mono break-words">ID Usuario: {usuarioId}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {transaccion.fecha ? new Date(transaccion.fecha).toLocaleString('es-ES', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : 'N/A'}
+                        </p>
+                      </div>
+                      <div className="flex items-center ml-4">
+                        <button onClick={() => handleOpenModal(transaccion)} className="text-green-400 hover:text-green-300 mr-2 transition">
+                          <Eye className="w-5 h-5" />
+                        </button>
+                        <button onClick={() => eliminarTransaccion(transaccion._id)} className="text-red-400 hover:text-red-300 transition">
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })
               )}
-              {loadingTransacciones && transacciones.length > 0 && (
-                <li className="p-4 text-center text-blue-200">Cargando más...</li>
+              
+              {/* Indicadores de carga y estado */}
+              {loadingMore && (
+                <li className="p-4 text-center text-blue-200">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400 mr-2"></div>
+                    Cargando más recargas...
+                  </div>
+                </li>
               )}
+              
               {!hasMore && transacciones.length > 0 && (
                 <li className="p-4 text-center text-blue-400 font-semibold">Fin de los resultados</li>
               )}
             </ul>
           )}
         </div>
+
+        {/* Botón para cargar más manualmente */}
+        {!loadingMore && hasMore && transacciones.length > 0 && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={loadMoreTransacciones}
+              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg transition-colors"
+            >
+              Cargar más recargas
+            </button>
+          </div>
+        )}
       </div>
 
       {modalVisible && (
@@ -293,10 +384,17 @@ export const RecargarBilletera = () => {
             {transaccionSeleccionada && (
               <div className="space-y-2 text-white">
                 <p><span className="font-semibold text-blue-200">ID Transacción:</span> <span className="font-mono break-all">{transaccionSeleccionada._id}</span></p>
-                <p><span className="font-semibold text-blue-200">ID Usuario:</span> <span className="font-mono break-all">{transaccionSeleccionada.usuario_id}</span></p>
+                <p><span className="font-semibold text-blue-200">ID Usuario:</span> <span className="font-mono break-all">{getUsuarioId(transaccionSeleccionada)}</span></p>
+                <p><span className="font-semibold text-blue-200">Nombre Usuario:</span> {getUsuarioNombre(transaccionSeleccionada)}</p>
                 <p><span className="font-semibold text-blue-200">Descripción:</span> {transaccionSeleccionada.descripcion}</p>
-                <p><span className="font-semibold text-blue-200">Monto:</span> <span className="font-mono text-green-400">${transaccionSeleccionada.monto.toFixed(2)}</span></p>
-                <p><span className="font-semibold text-blue-200">Fecha:</span> {new Date(transaccionSeleccionada.fecha).toLocaleString()}</p>
+                <p><span className="font-semibold text-blue-200">Monto:</span> <span className="font-mono text-green-400">${transaccionSeleccionada.monto?.toFixed(2) || '0.00'}</span></p>
+                <p><span className="font-semibold text-blue-200">Fecha:</span> {transaccionSeleccionada.fecha ? new Date(transaccionSeleccionada.fecha).toLocaleString('es-ES', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }) : 'N/A'}</p>
               </div>
             )}
             <button onClick={handleCloseModal} className="mt-6 bg-gradient-to-r from-blue-600 to-blue-500 text-white py-2 px-6 rounded-lg hover:from-blue-700 hover:to-blue-600 transition-all font-bold shadow-lg w-full">

@@ -49,6 +49,10 @@ export const ReferidosDirectos = () => {
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
   const [billeteraActiva, setBilleteraActiva] = useState(false);
   const [verificandoBilletera, setVerificandoBilletera] = useState(true);
+  const [paginacionRecibidas, setPaginacionRecibidas] = useState({});
+  const [paginacionEnviadas, setPaginacionEnviadas] = useState({});
+  const [paginaActualRecibidas, setPaginaActualRecibidas] = useState(1);
+  const [paginaActualEnviadas, setPaginaActualEnviadas] = useState(1);
 
   useEffect(() => {
     const usuario = localStorage.getItem('usuario');
@@ -79,16 +83,19 @@ export const ReferidosDirectos = () => {
     }
   };
 
-  const fetchSolicitudes = async (userId) => {
+  const fetchSolicitudes = async (userId, pageRecibidas = 1, pageEnviadas = 1) => {
     try {
       setIsLoading(true);
       const [recibidas, enviadas] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/recibidas/${userId}`),
-        axios.get(`${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/enviadas/${userId}`)
+        axios.get(`${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/recibidas/${userId}?page=${pageRecibidas}&limit=10`),
+        axios.get(`${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/enviadas/${userId}?page=${pageEnviadas}&limit=10`)
       ]);
       
-      setSolicitudesRecibidas(recibidas.data || []);
-      setSolicitudesEnviadas(enviadas.data || []);
+      // CORRECCIÓN: Extraer el array de solicitudes de la respuesta
+      setSolicitudesRecibidas(recibidas.data.solicitudes || []);
+      setSolicitudesEnviadas(enviadas.data.solicitudes || []);
+      setPaginacionRecibidas(recibidas.data.paginacion || {});
+      setPaginacionEnviadas(enviadas.data.paginacion || {});
     } catch (error) {
       console.error('Error al cargar solicitudes:', error);
       setMessage({ 
@@ -100,6 +107,16 @@ export const ReferidosDirectos = () => {
     }
   };
 
+  const handleCambiarPagina = (tab, nuevaPagina) => {
+    if (tab === 'recibidas') {
+      setPaginaActualRecibidas(nuevaPagina);
+      fetchSolicitudes(userId, nuevaPagina, paginaActualEnviadas);
+    } else {
+      setPaginaActualEnviadas(nuevaPagina);
+      fetchSolicitudes(userId, paginaActualRecibidas, nuevaPagina);
+    }
+  };
+
   const handleCambiarEstado = async (solicitudId, nuevoEstado) => {
     try {
       await axios.patch(
@@ -108,7 +125,7 @@ export const ReferidosDirectos = () => {
       );
 
       setMessage({ text: `Solicitud ${nuevoEstado}`, type: 'success' });
-      fetchSolicitudes(userId);
+      fetchSolicitudes(userId, paginaActualRecibidas, paginaActualEnviadas);
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Error al actualizar estado';
       setMessage({ text: errorMessage, type: 'error' });
@@ -144,65 +161,28 @@ export const ReferidosDirectos = () => {
 
     setIsProcessingBatch(true);
     try {
-      const usuarioString = localStorage.getItem('usuario');
-      if (!usuarioString) {
-        setMessage({ text: 'No se encontró el usuario en localStorage.', type: 'error' });
-        return;
-      }
+      // Usar el nuevo endpoint de aceptación múltiple
+      const response = await axios.post(
+        `${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/aceptar-multiples`,
+        { solicitudesIds: solicitudesAProcesar }
+      );
 
-      const usuario = JSON.parse(usuarioString);
-      const userResponse = await axios.get(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${usuario._id}`);
-      const nivel = userResponse.data.nivel;
-
-      let procesadasExitosamente = 0;
-      let errores = 0;
-      let erroresDetalles = [];
-
-      // Procesar cada solicitud seleccionada (máximo 20)
-      for (const solicitudId of solicitudesAProcesar) {
-        const solicitud = solicitudesRecibidas.find(s => s._id === solicitudId);
-        if (solicitud && solicitud.estado === 'pendiente') {
-          try {
-            // El usuario actual (que acepta) es el patrocinador
-            const solicitanteId = usuario._id;
-            
-            // 1. Cambiar estado de la solicitud
-            await axios.patch(
-              `${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/${solicitudId}`,
-              { estado: 'aceptado' }
-            );
-
-            // 2. Realizar la recarga al PATROCINADOR (usuario actual)
-            await axios.post(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/recarga-referido`, {
-              usuarioId: solicitanteId,
-              nivel: nivel,
-              referido_id: solicitud.referido_id?._id || solicitud.referido_id
-            });
-
-            procesadasExitosamente++;
-          } catch (error) {
-            console.error(`Error procesando solicitud ${solicitudId}:`, error);
-            const errorMsg = error.response?.data?.message || 'Error desconocido';
-            erroresDetalles.push(`Solicitud ${solicitudId}: ${errorMsg}`);
-            errores++;
-          }
-        }
-      }
-
-      if (errores > 0) {
+      const { resultados } = response.data;
+      
+      if (resultados.errores > 0) {
         setMessage({ 
-          text: `Procesadas ${procesadasExitosamente} solicitudes exitosamente, ${errores} fallaron. ${erroresDetalles.join('; ')}`, 
+          text: `Procesadas ${resultados.exitos} solicitudes exitosamente, ${resultados.errores} fallaron.`, 
           type: 'warning'
         });
       } else {
         setMessage({ 
-          text: `Todas las ${procesadasExitosamente} solicitudes procesadas exitosamente`, 
+          text: `Todas las ${resultados.exitos} solicitudes procesadas exitosamente`, 
           type: 'success'
         });
       }
       
       setSelectedSolicitudes([]);
-      fetchSolicitudes(userId);
+      fetchSolicitudes(userId, paginaActualRecibidas, paginaActualEnviadas);
     } catch (error) {
       setMessage({ 
         text: 'Error al procesar solicitudes por lote: ' + error.message, 
@@ -234,7 +214,7 @@ export const ReferidosDirectos = () => {
       setMessage({ text: 'Solicitud creada exitosamente', type: 'success' });
       setShowModal(false);
       setReferidoId('');
-      fetchSolicitudes(userId);
+      fetchSolicitudes(userId, paginaActualRecibidas, paginaActualEnviadas);
     } catch (error) {
       setMessage({ 
         text: error.response?.data?.message || 'Error al crear solicitud', 
@@ -259,7 +239,8 @@ export const ReferidosDirectos = () => {
 
   // Función para seleccionar todas las solicitudes pendientes (máximo 20)
   const seleccionarTodasPendientes = () => {
-    const pendientesIds = solicitudesRecibidas
+    const solicitudesArray = Array.isArray(solicitudesRecibidas) ? solicitudesRecibidas : [];
+    const pendientesIds = solicitudesArray
       .filter(s => s.estado === 'pendiente')
       .slice(0, 20)
       .map(s => s._id);
@@ -396,9 +377,17 @@ export const ReferidosDirectos = () => {
               onAceptarPorLote={handleAceptarPorLote}
               isProcessingBatch={isProcessingBatch}
               billeteraActiva={billeteraActiva}
+              paginacion={paginacionRecibidas}
+              paginaActual={paginaActualRecibidas}
+              onCambiarPagina={(pagina) => handleCambiarPagina('recibidas', pagina)}
             />
           ) : (
-            <SolicitudesEnviadas solicitudes={solicitudesEnviadas} />
+            <SolicitudesEnviadas 
+              solicitudes={solicitudesEnviadas} 
+              paginacion={paginacionEnviadas}
+              paginaActual={paginaActualEnviadas}
+              onCambiarPagina={(pagina) => handleCambiarPagina('enviadas', pagina)}
+            />
           )}
 
           {/* Modal para nueva solicitud */}
@@ -460,12 +449,18 @@ const SolicitudesRecibidas = ({
   onLimpiarSeleccion,
   onAceptarPorLote,
   isProcessingBatch,
-  billeteraActiva
+  billeteraActiva,
+  paginacion,
+  paginaActual,
+  onCambiarPagina
 }) => {
-  const solicitudesPendientes = solicitudes.filter(s => s.estado === 'pendiente');
-  const solicitudesProcesadas = solicitudes.filter(s => s.estado !== 'pendiente');
+  // CORRECCIÓN: Asegurarse de que solicitudes sea un array
+  const solicitudesArray = Array.isArray(solicitudes) ? solicitudes : [];
+  
+  const solicitudesPendientes = solicitudesArray.filter(s => s.estado === 'pendiente');
+  const solicitudesProcesadas = solicitudesArray.filter(s => s.estado !== 'pendiente');
 
-  if (solicitudes.length === 0) {
+  if (solicitudesArray.length === 0) {
     return (
       <div className="text-center py-8 bg-gray-700 bg-opacity-50 rounded-lg">
         <p className="text-gray-400">No tienes solicitudes recibidas.</p>
@@ -540,10 +535,10 @@ const SolicitudesRecibidas = ({
                     />
                     <div className="flex-1">
                       <h3 className="font-medium text-lg">
-                        {solicitud.referido_id?.nombre_completo || solicitud.referido_id?.nombre_usuario || 'Usuario referido'}
+                        {solicitud.solicitante_id?.nombre_completo || solicitud.solicitante_id?.nombre_usuario || 'Usuario solicitante'}
                       </h3>
                       <p className="text-gray-400 text-sm">
-                        @{solicitud.referido_id?.nombre_usuario || 'ID: ' + (solicitud.referido_id?._id || solicitud.referido_id)}
+                        @{solicitud.solicitante_id?.nombre_usuario || 'ID: ' + (solicitud.solicitante_id?._id || solicitud.solicitante_id)}
                       </p>
                       <div className="mt-2 flex items-center">
                         <span className="text-gray-300 mr-2">Estado:</span>
@@ -572,35 +567,7 @@ const SolicitudesRecibidas = ({
                           });
                           return;
                         }
-
-                        try {
-                          const usuarioString = localStorage.getItem('usuario');
-                          if (!usuarioString) {
-                            setMessage({ text: 'No se encontró el usuario en localStorage.', type: 'error' });
-                            return;
-                          }
-                          
-                          const usuario = JSON.parse(usuarioString);
-                          const userResponse = await axios.get(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${usuario._id}`);
-                          const nivel = userResponse.data.nivel;
-                          
-                          // El usuario actual (que acepta) es el patrocinador
-                          const solicitanteId = usuario._id;
-                          
-                          await onCambiarEstado(solicitud._id, 'aceptado');
-                          
-                          await axios.post(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/recarga-referido`, {
-                            usuarioId: solicitanteId,
-                            nivel: nivel,
-                            referido_id: solicitud.referido_id?._id || solicitud.referido_id
-                          });
-                          
-                          setMessage({ text: 'Solicitud aceptada y recarga procesada correctamente.', type: 'success' });
-                        } catch (error) {
-                          console.error('Error al procesar solicitud individual:', error);
-                          const errorMsg = error.response?.data?.message || 'Error al aceptar la solicitud.';
-                          setMessage({ text: errorMsg, type: 'error' });
-                        }
+                        await onCambiarEstado(solicitud._id, 'aceptado');
                       }}
                       disabled={!billeteraActiva}
                       className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg transition-all duration-200 flex items-center justify-center gap-2 font-medium text-sm sm:text-base"
@@ -634,10 +601,10 @@ const SolicitudesRecibidas = ({
               <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-gray-500">
                 <div>
                   <h3 className="font-medium">
-                    {solicitud.referido_id?.nombre_completo || solicitud.referido_id?.nombre_usuario || 'Usuario referido'}
+                    {solicitud.solicitante_id?.nombre_completo || solicitud.solicitante_id?.nombre_usuario || 'Usuario solicitante'}
                   </h3>
                   <p className="text-gray-400 text-sm">
-                    @{solicitud.referido_id?.nombre_usuario || 'ID: ' + (solicitud.referido_id?._id || solicitud.referido_id)}
+                    @{solicitud.solicitante_id?.nombre_usuario || 'ID: ' + (solicitud.solicitante_id?._id || solicitud.solicitante_id)}
                   </p>
                   <div className="mt-2 flex items-center">
                     <span className="text-gray-300 mr-2">Estado:</span>
@@ -664,13 +631,39 @@ const SolicitudesRecibidas = ({
           </div>
         </div>
       )}
+
+      {/* Paginación */}
+      {paginacion.totalPaginas > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-6">
+          <button
+            onClick={() => onCambiarPagina(paginaActual - 1)}
+            disabled={paginaActual === 1}
+            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed rounded"
+          >
+            Anterior
+          </button>
+          <span className="text-gray-300">
+            Página {paginaActual} de {paginacion.totalPaginas}
+          </span>
+          <button
+            onClick={() => onCambiarPagina(paginaActual + 1)}
+            disabled={paginaActual === paginacion.totalPaginas}
+            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed rounded"
+          >
+            Siguiente
+          </button>
+        </div>
+      )}
     </div>
   );
 };
 
 // Componente para mostrar solicitudes enviadas
-const SolicitudesEnviadas = ({ solicitudes }) => {
-  if (solicitudes.length === 0) {
+const SolicitudesEnviadas = ({ solicitudes, paginacion, paginaActual, onCambiarPagina }) => {
+  // CORRECCIÓN: Asegurarse de que solicitudes sea un array
+  const solicitudesArray = Array.isArray(solicitudes) ? solicitudes : [];
+
+  if (solicitudesArray.length === 0) {
     return (
       <div className="text-center py-8 bg-gray-700 bg-opacity-50 rounded-lg">
         <p className="text-gray-400">No has enviado solicitudes de referido.</p>
@@ -680,7 +673,7 @@ const SolicitudesEnviadas = ({ solicitudes }) => {
 
   return (
     <div className="space-y-4">
-      {solicitudes.map((solicitud) => (
+      {solicitudesArray.map((solicitud) => (
         <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-purple-500">
           <div>
             <h3 className="font-medium">
@@ -713,6 +706,29 @@ const SolicitudesEnviadas = ({ solicitudes }) => {
           </div>
         </div>
       ))}
+
+      {/* Paginación para solicitudes enviadas */}
+      {paginacion.totalPaginas > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-6">
+          <button
+            onClick={() => onCambiarPagina(paginaActual - 1)}
+            disabled={paginaActual === 1}
+            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed rounded"
+          >
+            Anterior
+          </button>
+          <span className="text-gray-300">
+            Página {paginaActual} de {paginacion.totalPaginas}
+          </span>
+          <button
+            onClick={() => onCambiarPagina(paginaActual + 1)}
+            disabled={paginaActual === paginacion.totalPaginas}
+            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed rounded"
+          >
+            Siguiente
+          </button>
+        </div>
+      )}
     </div>
   );
 };

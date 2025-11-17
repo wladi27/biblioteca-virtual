@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Background } from '../components/Background';
 import type { RegisterData } from '../types/auth';
-import { FaEye, FaEyeSlash } from 'react-icons/fa'; // Importar íconos para mostrar/ocultar contraseña
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { countries } from '../lib/countries';
 
 export const Register = () => {
@@ -19,93 +19,110 @@ export const Register = () => {
     dni: '',
     nombre_usuario: '',
     contraseña: '',
-    confirmar_contraseña: '', // Campo para confirmar contraseña
+    confirmar_contraseña: '',
     codigo_referido: '',
-    patrocinador_id: '', // New field for sponsor ID
+    patrocinador_id: '',
     pais: '',
   });
 
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | null }>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null); // Estado para el mensaje de error de contraseña
-  const [showPassword, setShowPassword] = useState(false); // Estado para mostrar/ocultar contraseña
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false); // Estado para mostrar/ocultar confirmación de contraseña
-  const [cantidadCuentas, setCantidadCuentas] = useState(1); // Nuevo estado para cantidad de cuentas
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [cantidadCuentas, setCantidadCuentas] = useState(1);
   const [usuariosCreados, setUsuariosCreados] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [phoneCodeLlamadas, setPhoneCodeLlamadas] = useState('');
   const [phoneCodeWhatsapp, setPhoneCodeWhatsapp] = useState('');
   const usuariosRef = useRef<HTMLTextAreaElement>(null);
-  const navigate = useNavigate(); // Hook para redireccionar
+  const navigate = useNavigate();
 
-// Register.tsx - REEMPLAZAR esta sección completa
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setPasswordError(null);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
 
-  if (formData.contraseña !== formData.confirmar_contraseña) {
-    setPasswordError('Las contraseñas no coinciden');
-    return;
-  }
-
-  let exitos = 0;
-  let errores = 0;
-  const usuarios: string[] = [];
-
-  for (let i = 0; i < cantidadCuentas; i++) {
-    const usuarioNombre = i === 0 ? formData.nombre_usuario : `${formData.nombre_usuario}${i}`;
-    const datosRegistro = {
-      ...formData,
-      nombre_usuario: usuarioNombre,
-      linea_llamadas: `+${phoneCodeLlamadas}${formData.linea_llamadas}`,
-      linea_whatsapp: `+${phoneCodeWhatsapp}${formData.linea_whatsapp}`,
-    };
-
-    try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(datosRegistro),
-      });
-
-      if (response.ok) {
-        exitos++;
-        const newUser = await response.json();
-        usuarios.push(newUser.nombre_usuario);
-
-        // CORRECCIÓN: Crear solicitud de referido con lógica correcta
-        if (formData.patrocinador_id) {
-          try {
-            await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/`, { 
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                // El SOLICITANTE es el patrocinador (existente)
-                solicitante_id: formData.patrocinador_id,
-                // El REFERIDO es el nuevo usuario
-                referido_id: newUser._id,
-              }),
-            });
-            console.log(`Solicitud de referido enviada correctamente para ${newUser.nombre_usuario}`);
-          } catch (referralError) {
-            console.error(`Error al enviar solicitud de referido:`, referralError);
-          }
-        }
-      } else {
-        errores++;
-      }
-    } catch (fetchError) {
-      errores++;
-      console.error(`Error de red al registrar usuario ${usuarioNombre}:`, fetchError);
+    if (formData.contraseña !== formData.confirmar_contraseña) {
+      setPasswordError('Las contraseñas no coinciden');
+      return;
     }
-  }
 
-  if (exitos > 0) {
-    setUsuariosCreados(usuarios);
-    setShowModal(true);
-  } else {
-    setMessage({ text: 'No se pudo registrar ninguna cuenta.', type: 'error' });
-  }
-};
+    let exitos = 0;
+    let errores = 0;
+    const usuarios: string[] = [];
+    const usuariosIds: string[] = [];
+
+    // PRIMERO: Crear todas las cuentas de usuario
+    for (let i = 0; i < cantidadCuentas; i++) {
+      const usuarioNombre = i === 0 ? formData.nombre_usuario : `${formData.nombre_usuario}${i}`;
+      const datosRegistro = {
+        ...formData,
+        nombre_usuario: usuarioNombre,
+        linea_llamadas: `+${phoneCodeLlamadas}${formData.linea_llamadas}`,
+        linea_whatsapp: `+${phoneCodeWhatsapp}${formData.linea_whatsapp}`,
+      };
+
+      try {
+        const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(datosRegistro),
+        });
+
+        if (response.ok) {
+          exitos++;
+          const newUser = await response.json();
+          usuarios.push(newUser.nombre_usuario);
+          usuariosIds.push(newUser._id);
+        } else {
+          errores++;
+        }
+      } catch (fetchError) {
+        errores++;
+        console.error(`Error de red al registrar usuario ${usuarioNombre}:`, fetchError);
+      }
+    }
+
+    // SEGUNDO: Si hay patrocinador y se crearon cuentas, crear solicitudes de referido
+    if (formData.patrocinador_id && exitos > 0) {
+      let solicitudesExitosas = 0;
+      let solicitudesFallidas = 0;
+
+      // Crear una solicitud por cada usuario nuevo
+      for (const usuarioId of usuariosIds) {
+        try {
+          // CORRECCIÓN: El SOLICITANTE es el usuario nuevo, el REFERIDO es el patrocinador
+          await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/`, { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              // El SOLICITANTE es el nuevo usuario (quien busca patrocinio)
+              solicitante_id: usuarioId,
+              // El REFERIDO es el patrocinador existente (quien recibe la solicitud)
+              referido_id: formData.patrocinador_id,
+            }),
+          });
+          solicitudesExitosas++;
+          console.log(`✅ Solicitud de referido creada para usuario ${usuarioId}`);
+        } catch (referralError) {
+          solicitudesFallidas++;
+          console.error(`❌ Error al crear solicitud para usuario ${usuarioId}:`, referralError);
+        }
+      }
+
+      console.log(`📊 Resumen solicitudes: ${solicitudesExitosas} exitosas, ${solicitudesFallidas} fallidas`);
+    }
+
+    if (exitos > 0) {
+      setUsuariosCreados(usuarios);
+      setShowModal(true);
+      setMessage({ 
+        text: `Se crearon ${exitos} cuenta(s) exitosamente. ${formData.patrocinador_id ? 'Solicitudes de referido enviadas al patrocinador.' : ''}`, 
+        type: 'success' 
+      });
+    } else {
+      setMessage({ text: 'No se pudo registrar ninguna cuenta.', type: 'error' });
+    }
+  };
 
   const handleCopy = () => {
     if (usuariosRef.current) {
@@ -129,7 +146,10 @@ const handleSubmit = async (e: React.FormEvent) => {
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
           <div className="bg-gray-800 p-8 rounded-xl shadow-lg max-w-md w-full">
-            <h3 className="text-xl font-bold mb-4 text-center">Usuarios creados</h3>
+            <h3 className="text-xl font-bold mb-4 text-center">Usuarios creados exitosamente</h3>
+            <p className="text-sm text-gray-300 mb-4 text-center">
+              Se crearon {usuariosCreados.length} cuenta(s){formData.patrocinador_id && ' con solicitudes de referido enviadas al patrocinador'}
+            </p>
             <textarea
               ref={usuariosRef}
               readOnly
@@ -170,9 +190,11 @@ const handleSubmit = async (e: React.FormEvent) => {
           )}
           
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Nuevo campo para cantidad de cuentas */}
+            {/* Campo para cantidad de cuentas */}
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Cantidad de cuentas a crear</label>
+              <label className="block text-sm font-medium text-gray-400 mb-2">
+                Cantidad de cuentas a crear
+              </label>
               <input
                 type="number"
                 min={1}
@@ -181,6 +203,11 @@ const handleSubmit = async (e: React.FormEvent) => {
                 onChange={(e) => setCantidadCuentas(Number(e.target.value))}
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              <p className="text-xs text-gray-400 mt-1">
+                {formData.patrocinador_id && cantidadCuentas > 1 && 
+                  `Se crearán ${cantidadCuentas} solicitudes de referido para el patrocinador`
+                }
+              </p>
             </div>
 
             {/* Campos del formulario */}
@@ -276,8 +303,6 @@ const handleSubmit = async (e: React.FormEvent) => {
               </div>
             </div>
 
-            
-
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-2">Banco o Exchange</label>
               <input
@@ -350,7 +375,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </button>
               </div>
             </div>
-            {passwordError && <p className="text-red-500 text-sm mt-1">{passwordError}</p>} {/* Mensaje de error de contraseña */}
 
             {/* Campo de Confirmación de Contraseña */}
             <div>
@@ -372,7 +396,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </button>
               </div>
             </div>
-            {passwordError && <p className="text-red-500 text-sm mt-1">{passwordError}</p>} {/* Mensaje de error de contraseña */}
+            {passwordError && <p className="text-red-500 text-sm mt-1 col-span-2">{passwordError}</p>}
 
             {/* Campo para ID del Patrocinador */}
             <div>
@@ -384,7 +408,10 @@ const handleSubmit = async (e: React.FormEvent) => {
                 onChange={(e) => setFormData({ ...formData, patrocinador_id: e.target.value })}
                 placeholder="Ingresa el ID de tu patrocinador"
               />
-              <p className="text-xs text-gray-400 mt-1">Si tienes un patrocinador, ingresa su ID aquí.</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Si tienes un patrocinador, ingresa su ID aquí. 
+                {cantidadCuentas > 1 && ` Se crearán ${cantidadCuentas} solicitudes para el patrocinador.`}
+              </p>
             </div>
 
             <div className="md:col-span-2">
