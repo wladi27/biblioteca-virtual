@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Background } from '../components/Background';
 import { AdminNav } from '../components/AdminNav';
 import Modal from '../components/Modal';
-import { Trash, CheckCircle } from 'lucide-react';
+import { Trash, CheckCircle, CheckSquare, Square } from 'lucide-react';
 import debounce from 'lodash/debounce';
 
 export const Validar = () => {
@@ -21,6 +21,9 @@ export const Validar = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const [totalItems, setTotalItems] = useState(0);
+    const [selectedAportes, setSelectedAportes] = useState(new Set());
+    const [isBatchValidating, setIsBatchValidating] = useState(false);
+    
     const itemsPerPage = 20;
 
     const observer = useRef();
@@ -35,11 +38,11 @@ export const Validar = () => {
             if (isInitialLoad) {
                 setLoading(true);
                 setPublicaciones([]);
+                setSelectedAportes(new Set()); // Limpiar selección al cargar nueva página
             } else {
                 setLoadingMore(true);
             }
 
-            // USAR EL NUEVO ENDPOINT ESPECÍFICO PARA NO VALIDADOS
             const url = `${import.meta.env.VITE_URL_LOCAL}/api/aportes/admin/no-validados?page=${page}&limit=${itemsPerPage}${search ? `&search=${encodeURIComponent(search)}` : ''}`;
             
             console.log('🔍 Llamando a API de no validados:', url);
@@ -56,7 +59,6 @@ export const Validar = () => {
             console.log(`   - Total items: ${data.pagination.totalItems}`);
             console.log(`   - Tiene más páginas: ${data.pagination.hasNext}`);
             
-            // TODOS los aportes que vienen son NO VALIDADOS, no necesitamos filtrar
             if (isInitialLoad) {
                 setPublicaciones(data.aportes);
             } else {
@@ -81,6 +83,7 @@ export const Validar = () => {
             console.log('🎯 Aplicando filtro:', value);
             setFilter(value);
             setPublicaciones([]);
+            setSelectedAportes(new Set());
             setCurrentPage(1);
             setHasMore(true);
             fetchPublicacionesNoValidadas(1, true, value);
@@ -113,6 +116,28 @@ export const Validar = () => {
         if (node) observer.current.observe(node);
     }, [loadingMore, hasMore, loadMorePublicaciones]);
 
+    // Funciones de selección
+    const toggleSelectAporte = (aporteId) => {
+        setSelectedAportes(prev => {
+            const newSelection = new Set(prev);
+            if (newSelection.has(aporteId)) {
+                newSelection.delete(aporteId);
+            } else {
+                newSelection.add(aporteId);
+            }
+            return newSelection;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedAportes.size === publicaciones.length) {
+            setSelectedAportes(new Set());
+        } else {
+            setSelectedAportes(new Set(publicaciones.map(pub => pub._id)));
+        }
+    };
+
+    // Validación individual
     const handleValidate = async (id) => {
         try {
             const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/aportes/${id}`, {
@@ -127,6 +152,12 @@ export const Validar = () => {
                 setMessage({ text: 'Aporte validado exitosamente', type: 'success' });
                 // Remover el aporte validado de la lista localmente
                 setPublicaciones(prev => prev.filter(pub => pub._id !== id));
+                // Remover de la selección si estaba seleccionado
+                setSelectedAportes(prev => {
+                    const newSelection = new Set(prev);
+                    newSelection.delete(id);
+                    return newSelection;
+                });
             } else {
                 const errorData = await response.json();
                 setMessage({ text: errorData.message || 'Error al validar el aporte', type: 'error' });
@@ -134,6 +165,56 @@ export const Validar = () => {
         } catch (error) {
             console.error('Error:', error);
             setMessage({ text: 'Error al conectar con el servidor', type: 'error' });
+        }
+    };
+
+    // Validación por lotes
+    const handleBatchValidate = async () => {
+        if (selectedAportes.size === 0) {
+            setMessage({ text: 'Selecciona al menos un aporte para validar', type: 'error' });
+            return;
+        }
+
+        setIsBatchValidating(true);
+        try {
+            const promises = Array.from(selectedAportes).map(id =>
+                fetch(`${import.meta.env.VITE_URL_LOCAL}/api/aportes/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ aporte: true }),
+                })
+            );
+
+            const results = await Promise.allSettled(promises);
+            
+            let successCount = 0;
+            let errorCount = 0;
+
+            results.forEach((result, index) => {
+                if (result.status === 'fulfilled' && result.value.ok) {
+                    successCount++;
+                } else {
+                    errorCount++;
+                }
+            });
+
+            if (errorCount === 0) {
+                setMessage({ text: `✅ ${successCount} aportes validados exitosamente`, type: 'success' });
+            } else {
+                setMessage({ text: `✅ ${successCount} validados, ❌ ${errorCount} errores`, type: 'error' });
+            }
+
+            // Remover los aportes validados de la lista
+            setPublicaciones(prev => prev.filter(pub => !selectedAportes.has(pub._id)));
+            setSelectedAportes(new Set());
+
+        } catch (error) {
+            console.error('Error en validación por lotes:', error);
+            setMessage({ text: 'Error al conectar con el servidor', type: 'error' });
+        } finally {
+            setIsBatchValidating(false);
         }
     };
 
@@ -147,6 +228,12 @@ export const Validar = () => {
                 setMessage({ text: 'Aporte eliminado exitosamente', type: 'success' });
                 // Remover el aporte eliminado de la lista localmente
                 setPublicaciones(prev => prev.filter(pub => pub._id !== id));
+                // Remover de la selección si estaba seleccionado
+                setSelectedAportes(prev => {
+                    const newSelection = new Set(prev);
+                    newSelection.delete(id);
+                    return newSelection;
+                });
             } else {
                 const errorData = await response.json();
                 setMessage({ text: errorData.message || 'Error al eliminar el aporte', type: 'error' });
@@ -227,6 +314,7 @@ export const Validar = () => {
                             Pendientes: {totalItems} aportes
                         </span>
                     )}
+                    <span className="block text-sm text-red-500 mt-2 font-normal">Máximo 20 validaciones por lote</span>
                 </h2>
 
                 {message && (
@@ -235,18 +323,70 @@ export const Validar = () => {
                     </div>
                 )}
 
-                {/* Botón para abrir el modal de validación por ID */}
-                <button
-                    className="mb-6 w-full bg-gradient-to-r from-blue-700 to-blue-900 text-white py-3 px-4 rounded-lg font-bold shadow-lg hover:from-blue-800 hover:to-blue-600 transition-all"
-                    onClick={() => {
-                        setIsValidateModalOpen(true);
-                        setValidateUserId('');
-                        setValidateUser(null);
-                        setValidateError('');
-                    }}
-                >
-                    Validar aporte por ID de usuario
-                </button>
+                {/* Botones de acción principal */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <button
+                        className="bg-gradient-to-r from-blue-700 to-blue-900 text-white py-3 px-4 rounded-lg font-bold shadow-lg hover:from-blue-800 hover:to-blue-600 transition-all flex items-center justify-center"
+                        onClick={() => {
+                            setIsValidateModalOpen(true);
+                            setValidateUserId('');
+                            setValidateUser(null);
+                            setValidateError('');
+                        }}
+                    >
+                        <CheckCircle className="mr-2" size={20} />
+                        Validar por ID de usuario
+                    </button>
+
+                    {selectedAportes.size > 0 && (
+                        <button
+                            className="bg-gradient-to-r from-green-700 to-green-900 text-white py-3 px-4 rounded-lg font-bold shadow-lg hover:from-green-800 hover:to-green-600 transition-all flex items-center justify-center"
+                            onClick={handleBatchValidate}
+                            disabled={isBatchValidating}
+                        >
+                            {isBatchValidating ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                    Validando...
+                                </>
+                            ) : (
+                                <>
+                                    <CheckSquare className="mr-2" size={20} />
+                                    Validar {selectedAportes.size} seleccionados
+                                </>
+                            )}
+                        </button>
+                    )}
+                </div>
+
+                {/* Barra de selección múltiple */}
+                {publicaciones.length > 0 && (
+                    <div className="mb-4 p-4 bg-gray-800/50 rounded-lg border border-blue-700 flex items-center justify-between">
+                        <div className="flex items-center">
+                            <button
+                                onClick={toggleSelectAll}
+                                className="flex items-center text-blue-300 hover:text-blue-200 transition-colors"
+                            >
+                                {selectedAportes.size === publicaciones.length ? (
+                                    <CheckSquare className="mr-2" size={20} />
+                                ) : (
+                                    <Square className="mr-2" size={20} />
+                                )}
+                                <span className="text-sm font-medium">
+                                    {selectedAportes.size === publicaciones.length 
+                                        ? 'Deseleccionar todos' 
+                                        : 'Seleccionar todos'}
+                                </span>
+                            </button>
+                        </div>
+                        
+                        {selectedAportes.size > 0 && (
+                            <div className="text-blue-300 text-sm font-medium">
+                                {selectedAportes.size} de {publicaciones.length} seleccionados
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="mb-8 flex items-center bg-gray-800 rounded-lg px-4 py-2 border border-blue-700 shadow">
                     <input
@@ -308,39 +448,65 @@ export const Validar = () => {
                         <ul className="space-y-6 mb-6">
                             {publicaciones.map((pub, index) => {
                                 const isLastItem = index === publicaciones.length - 1;
+                                const isSelected = selectedAportes.has(pub._id);
                                 
                                 return (
                                     <li 
                                         key={`${pub._id}-${index}`}
                                         ref={isLastItem ? lastPublicacionElementRef : null}
-                                        className="bg-gradient-to-r from-blue-800 to-blue-600 p-6 rounded-xl shadow-lg border border-blue-700 flex flex-col gap-2"
+                                        className={`bg-gradient-to-r from-blue-800 to-blue-600 p-6 rounded-xl shadow-lg border-2 transition-all ${
+                                            isSelected 
+                                                ? 'border-green-400 ring-2 ring-green-400/50' 
+                                                : 'border-blue-700'
+                                        }`}
                                     >
-                                        <div className="flex items-center gap-4 mb-2">
-                                            <div className="flex flex-col">
-                                                <span className="font-bold text-lg text-white">
-                                                    {pub.usuario?.nombre_completo || 'Usuario no encontrado'}
-                                                </span>
-                                                <span className="text-blue-200 font-mono text-sm">
-                                                    @{pub.usuario?.nombre_usuario || '---'}
-                                                </span>
-                                                <span className="text-xs text-blue-100 mt-1">
-                                                    ID: <span className="font-mono">{pub.usuarioId}</span>
-                                                </span>
-                                                {pub.usuario?.dni && (
-                                                    <span className="text-xs text-blue-100">
-                                                        DNI: <span className="font-mono">{pub.usuario.dni}</span>
-                                                    </span>
+                                        {/* Checkbox de selección */}
+                                        <div className="flex items-start gap-3 mb-3">
+                                            <button
+                                                onClick={() => toggleSelectAporte(pub._id)}
+                                                className={`mt-1 p-1 rounded transition-colors ${
+                                                    isSelected 
+                                                        ? 'text-green-400 bg-green-400/20' 
+                                                        : 'text-gray-300 hover:text-blue-200'
+                                                }`}
+                                            >
+                                                {isSelected ? (
+                                                    <CheckSquare size={20} />
+                                                ) : (
+                                                    <Square size={20} />
                                                 )}
-                                                {pub.usuario?.nivel && (
-                                                    <span className="text-xs text-blue-100">
-                                                        Nivel: <span className="font-mono">{pub.usuario.nivel}</span>
+                                            </button>
+                                            
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-4 mb-2">
+                                                    <div className="flex flex-col flex-1">
+                                                        <span className="font-bold text-lg text-white">
+                                                            {pub.usuario?.nombre_completo || 'Usuario no encontrado'}
+                                                        </span>
+                                                        <span className="text-blue-200 font-mono text-sm">
+                                                            @{pub.usuario?.nombre_usuario || '---'}
+                                                        </span>
+                                                        <span className="text-xs text-blue-100 mt-1">
+                                                            ID: <span className="font-mono">{pub.usuarioId}</span>
+                                                        </span>
+                                                        {pub.usuario?.dni && (
+                                                            <span className="text-xs text-blue-100">
+                                                                DNI: <span className="font-mono">{pub.usuario.dni}</span>
+                                                            </span>
+                                                        )}
+                                                        {pub.usuario?.nivel && (
+                                                            <span className="text-xs text-blue-100">
+                                                                Nivel: <span className="font-mono">{pub.usuario.nivel}</span>
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="px-3 py-1 rounded-full bg-yellow-600 text-yellow-200 text-xs font-semibold">
+                                                        Pendiente
                                                     </span>
-                                                )}
+                                                </div>
                                             </div>
-                                            <span className="ml-auto px-3 py-1 rounded-full bg-yellow-600 text-yellow-200 text-xs font-semibold">
-                                                Pendiente
-                                            </span>
                                         </div>
+
                                         <hr className="border-blue-700 my-2" />
                                         {pub.usuario?.padre && (
                                             <div className="flex flex-col md:flex-row md:items-center md:gap-8 gap-2">
