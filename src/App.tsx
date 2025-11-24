@@ -28,6 +28,7 @@ import ReferidosDirectos from './pages/ReferidosDirectos';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { initSocket, disconnectSocket } from './socket';
 import { useAuthStore } from './store/authStore';
+import { BilleterasFaltantes } from './pages/BilleterasFaltantes';
 {/* import ServiceSuspendedNotice from './pages/Suspen'; */}
 
 function App() {
@@ -74,6 +75,7 @@ function App() {
           <Route path="/BV/descargar-datos" element={<DescargarDatosPage />} />
           <Route path="/BV/restaurar-password" element={<CambiarContrasena />} /> 
           <Route path="/referidos-directos" element={<ReferidosDirectos />} />
+          <Route path="/admin/billeteras-faltantes" element={<BilleterasFaltantes />} />
         </Route>
       </Routes>
     </Router>
@@ -81,3 +83,5 @@ function App() {
 }
 
 export default App;
+
+

@@ -86,12 +86,16 @@ export const ReferidosDirectos = () => {
   const fetchSolicitudes = async (userId, pageRecibidas = 1, pageEnviadas = 1) => {
     try {
       setIsLoading(true);
+      
+      // Para solicitudes recibidas, traer TODOS los estados
       const [recibidas, enviadas] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/recibidas/${userId}?page=${pageRecibidas}&limit=10`),
-        axios.get(`${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/enviadas/${userId}?page=${pageEnviadas}&limit=10`)
+        axios.get(`${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/recibidas/${userId}?page=${pageRecibidas}&limit=10&estado=todos`),
+        axios.get(`${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/enviadas/${userId}?page=${pageEnviadas}&limit=10&estado=todos`)
       ]);
       
-      // CORRECCIÓN: Extraer el array de solicitudes de la respuesta
+      console.log('📥 Solicitudes recibidas:', recibidas.data.solicitudes);
+      console.log('📤 Solicitudes enviadas:', enviadas.data.solicitudes);
+      
       setSolicitudesRecibidas(recibidas.data.solicitudes || []);
       setSolicitudesEnviadas(enviadas.data.solicitudes || []);
       setPaginacionRecibidas(recibidas.data.paginacion || {});
@@ -125,7 +129,12 @@ export const ReferidosDirectos = () => {
       );
 
       setMessage({ text: `Solicitud ${nuevoEstado}`, type: 'success' });
-      fetchSolicitudes(userId, paginaActualRecibidas, paginaActualEnviadas);
+      
+      // Recargar las solicitudes después de cambiar el estado
+      setTimeout(() => {
+        fetchSolicitudes(userId, paginaActualRecibidas, paginaActualEnviadas);
+      }, 500);
+      
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Error al actualizar estado';
       setMessage({ text: errorMessage, type: 'error' });
@@ -181,8 +190,14 @@ export const ReferidosDirectos = () => {
         });
       }
       
+      // Limpiar selección y recargar datos
       setSelectedSolicitudes([]);
-      fetchSolicitudes(userId, paginaActualRecibidas, paginaActualEnviadas);
+      
+      // Recargar las solicitudes después de un breve delay
+      setTimeout(() => {
+        fetchSolicitudes(userId, paginaActualRecibidas, paginaActualEnviadas);
+      }, 500);
+      
     } catch (error) {
       setMessage({ 
         text: 'Error al procesar solicitudes por lote: ' + error.message, 
@@ -214,7 +229,12 @@ export const ReferidosDirectos = () => {
       setMessage({ text: 'Solicitud creada exitosamente', type: 'success' });
       setShowModal(false);
       setReferidoId('');
-      fetchSolicitudes(userId, paginaActualRecibidas, paginaActualEnviadas);
+      
+      // Recargar las solicitudes después de crear una nueva
+      setTimeout(() => {
+        fetchSolicitudes(userId, paginaActualRecibidas, paginaActualEnviadas);
+      }, 500);
+      
     } catch (error) {
       setMessage({ 
         text: error.response?.data?.message || 'Error al crear solicitud', 
@@ -438,7 +458,7 @@ export const ReferidosDirectos = () => {
   );
 };
 
-// Componente para mostrar solicitudes recibidas
+// Componente para mostrar solicitudes recibidas - VERSIÓN CORREGIDA
 const SolicitudesRecibidas = ({ 
   solicitudes, 
   onCambiarEstado, 
@@ -454,11 +474,20 @@ const SolicitudesRecibidas = ({
   paginaActual,
   onCambiarPagina
 }) => {
-  // CORRECCIÓN: Asegurarse de que solicitudes sea un array
+  // CORRECCIÓN: Asegurarse de que solicitudes sea un array y clasificarlas correctamente
   const solicitudesArray = Array.isArray(solicitudes) ? solicitudes : [];
   
+  // Filtrar correctamente las solicitudes por estado
   const solicitudesPendientes = solicitudesArray.filter(s => s.estado === 'pendiente');
-  const solicitudesProcesadas = solicitudesArray.filter(s => s.estado !== 'pendiente');
+  const solicitudesAceptadas = solicitudesArray.filter(s => s.estado === 'aceptado');
+  const solicitudesRechazadas = solicitudesArray.filter(s => s.estado === 'rechazado');
+
+  console.log('📊 Solicitudes clasificadas:', {
+    total: solicitudesArray.length,
+    pendientes: solicitudesPendientes.length,
+    aceptadas: solicitudesAceptadas.length,
+    rechazadas: solicitudesRechazadas.length
+  });
 
   if (solicitudesArray.length === 0) {
     return (
@@ -472,7 +501,7 @@ const SolicitudesRecibidas = ({
     <div className="space-y-6">
       {/* Controles de lote para solicitudes pendientes */}
       {solicitudesPendientes.length > 0 && (
-        <div className="bg-gray-700 p-4 rounded-lg border-l-4 border-green-500">
+        <div className="bg-gray-700 p-4 rounded-lg border-l-4 border-yellow-500">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-4">
               <div>
@@ -543,7 +572,7 @@ const SolicitudesRecibidas = ({
                       <div className="mt-2 flex items-center">
                         <span className="text-gray-300 mr-2">Estado:</span>
                         <span className="px-2 py-1 rounded-full text-xs bg-yellow-500 text-white">
-                          {solicitud.estado}
+                          Pendiente
                         </span>
                       </div>
                       <p className="text-gray-400 text-sm mt-1">
@@ -590,17 +619,17 @@ const SolicitudesRecibidas = ({
         </div>
       )}
 
-      {/* Solicitudes procesadas */}
-      {solicitudesProcesadas.length > 0 && (
+      {/* Solicitudes aceptadas */}
+      {solicitudesAceptadas.length > 0 && (
         <div>
           <h3 className="text-lg font-medium mb-4 text-gray-300">
-            Solicitudes Procesadas ({solicitudesProcesadas.length})
+            Solicitudes Aceptadas ({solicitudesAceptadas.length})
           </h3>
           <div className="space-y-4">
-            {solicitudesProcesadas.map((solicitud) => (
-              <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-gray-500">
+            {solicitudesAceptadas.map((solicitud) => (
+              <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-green-500">
                 <div>
-                  <h3 className="font-medium">
+                  <h3 className="font-medium text-lg text-green-300">
                     {solicitud.solicitante_id?.nombre_completo || solicitud.solicitante_id?.nombre_usuario || 'Usuario solicitante'}
                   </h3>
                   <p className="text-gray-400 text-sm">
@@ -608,22 +637,74 @@ const SolicitudesRecibidas = ({
                   </p>
                   <div className="mt-2 flex items-center">
                     <span className="text-gray-300 mr-2">Estado:</span>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      solicitud.estado === 'aceptado' 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-red-500 text-white'
-                    }`}>
-                      {solicitud.estado}
+                    <span className="px-2 py-1 rounded-full text-xs bg-green-500 text-white">
+                      Aceptado
                     </span>
                   </div>
                   <p className="text-gray-400 text-sm mt-1">
-                    {new Date(solicitud.fecha || solicitud.createdAt).toLocaleDateString('es-ES', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+                    Aceptado el: {solicitud.fecha_respuesta ? 
+                      new Date(solicitud.fecha_respuesta).toLocaleDateString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : 
+                      new Date(solicitud.updatedAt).toLocaleDateString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    }
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Solicitudes rechazadas */}
+      {solicitudesRechazadas.length > 0 && (
+        <div>
+          <h3 className="text-lg font-medium mb-4 text-gray-300">
+            Solicitudes Rechazadas ({solicitudesRechazadas.length})
+          </h3>
+          <div className="space-y-4">
+            {solicitudesRechazadas.map((solicitud) => (
+              <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-red-500">
+                <div>
+                  <h3 className="font-medium text-lg text-red-300">
+                    {solicitud.solicitante_id?.nombre_completo || solicitud.solicitante_id?.nombre_usuario || 'Usuario solicitante'}
+                  </h3>
+                  <p className="text-gray-400 text-sm">
+                    @{solicitud.solicitante_id?.nombre_usuario || 'ID: ' + (solicitud.solicitante_id?._id || solicitud.solicitante_id)}
+                  </p>
+                  <div className="mt-2 flex items-center">
+                    <span className="text-gray-300 mr-2">Estado:</span>
+                    <span className="px-2 py-1 rounded-full text-xs bg-red-500 text-white">
+                      Rechazado
+                    </span>
+                  </div>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Rechazado el: {solicitud.fecha_respuesta ? 
+                      new Date(solicitud.fecha_respuesta).toLocaleDateString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : 
+                      new Date(solicitud.updatedAt).toLocaleDateString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    }
                   </p>
                 </div>
               </div>
@@ -658,10 +739,15 @@ const SolicitudesRecibidas = ({
   );
 };
 
-// Componente para mostrar solicitudes enviadas
+// Componente para mostrar solicitudes enviadas - VERSIÓN CORREGIDA
 const SolicitudesEnviadas = ({ solicitudes, paginacion, paginaActual, onCambiarPagina }) => {
   // CORRECCIÓN: Asegurarse de que solicitudes sea un array
   const solicitudesArray = Array.isArray(solicitudes) ? solicitudes : [];
+
+  // Clasificar las solicitudes enviadas por estado
+  const solicitudesPendientes = solicitudesArray.filter(s => s.estado === 'pendiente');
+  const solicitudesAceptadas = solicitudesArray.filter(s => s.estado === 'aceptado');
+  const solicitudesRechazadas = solicitudesArray.filter(s => s.estado === 'rechazado');
 
   if (solicitudesArray.length === 0) {
     return (
@@ -672,40 +758,138 @@ const SolicitudesEnviadas = ({ solicitudes, paginacion, paginaActual, onCambiarP
   }
 
   return (
-    <div className="space-y-4">
-      {solicitudesArray.map((solicitud) => (
-        <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-purple-500">
-          <div>
-            <h3 className="font-medium">
-              {solicitud.referido_id?.nombre_completo || solicitud.referido_id?.nombre_usuario || 'Usuario referido'}
-            </h3>
-            <p className="text-gray-400 text-sm">
-              @{solicitud.referido_id?.nombre_usuario || 'ID: ' + (solicitud.referido_id?._id || solicitud.referido_id)}
-            </p>
-            <div className="mt-2 flex items-center">
-              <span className="text-gray-300 mr-2">Estado:</span>
-              <span className={`px-2 py-1 rounded-full text-xs ${
-                solicitud.estado === 'aceptado' 
-                  ? 'bg-green-500 text-white' 
-                  : solicitud.estado === 'rechazado' 
-                    ? 'bg-red-500 text-white'
-                    : 'bg-yellow-500 text-white'
-              }`}>
-                {solicitud.estado}
-              </span>
-            </div>
-            <p className="text-gray-400 text-sm mt-1">
-              {new Date(solicitud.fecha || solicitud.createdAt).toLocaleDateString('es-ES', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </p>
+    <div className="space-y-6">
+      {/* Solicitudes pendientes enviadas */}
+      {solicitudesPendientes.length > 0 && (
+        <div>
+          <h3 className="text-lg font-medium mb-4 text-gray-300">
+            Solicitudes Pendientes ({solicitudesPendientes.length})
+          </h3>
+          <div className="space-y-4">
+            {solicitudesPendientes.map((solicitud) => (
+              <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-yellow-500">
+                <div>
+                  <h3 className="font-medium">
+                    {solicitud.referido_id?.nombre_completo || solicitud.referido_id?.nombre_usuario || 'Usuario referido'}
+                  </h3>
+                  <p className="text-gray-400 text-sm">
+                    @{solicitud.referido_id?.nombre_usuario || 'ID: ' + (solicitud.referido_id?._id || solicitud.referido_id)}
+                  </p>
+                  <div className="mt-2 flex items-center">
+                    <span className="text-gray-300 mr-2">Estado:</span>
+                    <span className="px-2 py-1 rounded-full text-xs bg-yellow-500 text-white">
+                      Pendiente
+                    </span>
+                  </div>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Enviado el: {new Date(solicitud.fecha || solicitud.createdAt).toLocaleDateString('es-ES', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      ))}
+      )}
+
+      {/* Solicitudes aceptadas enviadas */}
+      {solicitudesAceptadas.length > 0 && (
+        <div>
+          <h3 className="text-lg font-medium mb-4 text-gray-300">
+            Solicitudes Aceptadas ({solicitudesAceptadas.length})
+          </h3>
+          <div className="space-y-4">
+            {solicitudesAceptadas.map((solicitud) => (
+              <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-green-500">
+                <div>
+                  <h3 className="font-medium text-green-300">
+                    {solicitud.referido_id?.nombre_completo || solicitud.referido_id?.nombre_usuario || 'Usuario referido'}
+                  </h3>
+                  <p className="text-gray-400 text-sm">
+                    @{solicitud.referido_id?.nombre_usuario || 'ID: ' + (solicitud.referido_id?._id || solicitud.referido_id)}
+                  </p>
+                  <div className="mt-2 flex items-center">
+                    <span className="text-gray-300 mr-2">Estado:</span>
+                    <span className="px-2 py-1 rounded-full text-xs bg-green-500 text-white">
+                      Aceptado
+                    </span>
+                  </div>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Aceptado el: {solicitud.fecha_respuesta ? 
+                      new Date(solicitud.fecha_respuesta).toLocaleDateString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : 
+                      new Date(solicitud.updatedAt).toLocaleDateString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    }
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Solicitudes rechazadas enviadas */}
+      {solicitudesRechazadas.length > 0 && (
+        <div>
+          <h3 className="text-lg font-medium mb-4 text-gray-300">
+            Solicitudes Rechazadas ({solicitudesRechazadas.length})
+          </h3>
+          <div className="space-y-4">
+            {solicitudesRechazadas.map((solicitud) => (
+              <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-red-500">
+                <div>
+                  <h3 className="font-medium text-red-300">
+                    {solicitud.referido_id?.nombre_completo || solicitud.referido_id?.nombre_usuario || 'Usuario referido'}
+                  </h3>
+                  <p className="text-gray-400 text-sm">
+                    @{solicitud.referido_id?.nombre_usuario || 'ID: ' + (solicitud.referido_id?._id || solicitud.referido_id)}
+                  </p>
+                  <div className="mt-2 flex items-center">
+                    <span className="text-gray-300 mr-2">Estado:</span>
+                    <span className="px-2 py-1 rounded-full text-xs bg-red-500 text-white">
+                      Rechazado
+                    </span>
+                  </div>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Rechazado el: {solicitud.fecha_respuesta ? 
+                      new Date(solicitud.fecha_respuesta).toLocaleDateString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : 
+                      new Date(solicitud.updatedAt).toLocaleDateString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    }
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Paginación para solicitudes enviadas */}
       {paginacion.totalPaginas > 1 && (

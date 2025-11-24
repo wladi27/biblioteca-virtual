@@ -129,6 +129,18 @@ export const PerfilAdmin = () => {
             </div>
           </div>
 
+           {/* Tarjeta de Recarga Billeteras Faltantes*/}
+          <div
+            className="bg-gradient-to-r from-blue-800 to-blue-600 p-6 rounded-xl shadow-md flex items-center cursor-pointer hover:scale-[1.03] transition-transform border border-blue-500"
+            onClick={() => navigate('/admin/billeteras-faltantes')}
+          >
+            <FaMoneyBillWave className="text-3xl mr-4 text-blue-200" />
+            <div>
+              <h2 className="text-xl font-semibold text-white">Billeteras Faltantes</h2>
+              <p className="text-blue-200 text-sm">Gestiona billeteras sin recargar</p>
+            </div>
+          </div>
+
           {/* Tarjeta de Resetear contraseña de usuario */}
           <div
             className="bg-gradient-to-r from-blue-800 to-blue-600 p-6 rounded-xl shadow-md flex items-center cursor-pointer hover:scale-[1.03] transition-transform border border-blue-500"
