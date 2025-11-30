@@ -35,332 +35,22 @@ export default function WalletApp() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
+  // Nuevo estado para el modal de restricción
+  const [showRestriccionModal, setShowRestriccionModal] = useState(false);
 
-  // Función para obtener la tasa de cambio
-  const obtenerTasaCambio = async () => {
-    setLoadingTasa(true);
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/dolar`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setTasaCambio(data.value);
-      }
-    } catch (error) {
-      console.error("Error al obtener tasa de cambio:", error);
-    } finally {
-      setLoadingTasa(false);
-    }
+  // ... (el resto de tus funciones y useEffects permanecen igual)
+
+  // Función para manejar el clic en retirar
+  const handleRetirarClick = () => {
+    setShowRestriccionModal(true);
   };
 
-  // Convertir el saldo a dólares
-  const convertirADolares = (saldo) => {
-    if (tasaCambio === 0) return 0;
-    return saldo / tasaCambio;
+  // Función para cerrar el modal de restricción
+  const closeRestriccionModal = () => {
+    setShowRestriccionModal(false);
   };
 
-  // Formatear el saldo según la moneda seleccionada
-  const formatearSaldo = (saldo) => {
-    const dolares = convertirADolares(saldo);
-    return dolares.toLocaleString("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  };
-
-  // Función para obtener historial con paginación
-  const obtenerHistorialTransacciones = async (usuarioId, page = 1, isLoadMore = false) => {
-    if (isLoadMore) {
-      setLoadingMore(true);
-    } else {
-      setLoadingHistorial(true);
-    }
-
-    try {
-      const queryParams = new URLSearchParams({
-        page: page.toString(),
-        limit: '10'
-      });
-
-      // Si hay búsqueda, enviarla al backend
-      if (busqueda) {
-        queryParams.append('search', busqueda);
-      }
-
-      console.log('Obteniendo transacciones - Página:', page, 'Búsqueda:', busqueda);
-
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${usuarioId}?${queryParams}`
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Datos recibidos - Página:', page, 'HasMore:', data.paginacion.hasMore, 'Total:', data.paginacion.totalTransacciones);
-        
-        if (isLoadMore) {
-          // Agregar nuevas transacciones al historial existente
-          setHistorial(prev => [...prev, ...data.transacciones]);
-        } else {
-          // Reemplazar el historial completo
-          setHistorial(data.transacciones);
-        }
-        
-        setHasMore(data.paginacion.hasMore);
-        setPagina(page);
-      } else {
-        console.error('Error en respuesta:', response.status);
-      }
-    } catch (error) {
-      console.error("Error al obtener el historial de transacciones:", error);
-    } finally {
-      setLoadingHistorial(false);
-      setLoadingMore(false);
-    }
-  };
-
-  // Función para cargar más transacciones
-  const cargarMasTransacciones = () => {
-    if (!loadingMore && hasMore && userId) {
-      console.log('Cargando página:', pagina + 1);
-      obtenerHistorialTransacciones(userId, pagina + 1, true);
-    }
-  };
-
-  useEffect(() => {
-    const usuario = localStorage.getItem("usuario");
-    if (usuario) {
-      const userData = JSON.parse(usuario);
-      setUserId(userData._id);
-      verificarBilletera(userData._id);
-      obtenerSaldoUsuario(userData._id);
-      obtenerHistorialTransacciones(userData._id, 1, false);
-      obtenerTasaCambio();
-    } else {
-      setLoading(false);
-    }
-  }, []);
-
-  // Resetear paginación cuando cambian los filtros o búsqueda
-  useEffect(() => {
-    if (userId) {
-      console.log('Filtro o búsqueda cambiada - reseteando paginación');
-      setPagina(1);
-      setHasMore(true);
-      setHistorial([]);
-      obtenerHistorialTransacciones(userId, 1, false);
-    }
-  }, [filtro, busqueda]);
-
-  const verificarBilletera = async (usuarioId) => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/billetera/estado/${usuarioId}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setBilleteraActiva(data.activa);
-        if (data.activa) {
-          obtenerDatosBilletera(usuarioId);
-        }
-      }
-    } catch (error) {
-      console.error("Error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const obtenerDatosBilletera = async (usuarioId) => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/billetera/wallet/${usuarioId}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setWalletId(data._id);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-    }
-  };
-
-  const obtenerSaldoUsuario = async (usuarioId) => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/usuarios/saldo/${usuarioId}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setBalance(data.saldo);
-      }
-    } catch (error) {
-      console.error("Error al obtener el saldo:", error);
-    }
-  };
-
-  const activarBilletera = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/billetera/activar`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (response.status === 201) {
-        const userData = JSON.parse(localStorage.getItem("usuario"));
-        setBilleteraActiva(true);
-        obtenerDatosBilletera(userData._id);
-      } else {
-        throw new Error("Error al activar la billetera.");
-      }
-    } catch (error) {
-      setError("Error al activar la billetera. Inténtalo de nuevo.");
-      console.error("Error al activar la billetera:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEnviarDinero = async ({ destinatarioId, monto, notas }) => {
-    try {
-      const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
-      const token = localStorage.getItem("token");
-      
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/enviar`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          destinatario_id: destinatarioId,
-          monto,
-          notas
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.mensaje || "Error al enviar el dinero");
-      }
-
-      await obtenerSaldoUsuario(usuario._id);
-      // Recargar historial desde el inicio después de una transacción
-      setPagina(1);
-      setHasMore(true);
-      setHistorial([]);
-      await obtenerHistorialTransacciones(usuario._id, 1, false);
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const handleRetirarDinero = async ({ monto, notas }) => {
-    try {
-      const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
-      const token = localStorage.getItem("token");
-      
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/retirar`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          monto,
-          notas
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.mensaje || "Error al retirar el dinero");
-      }
-
-      await obtenerSaldoUsuario(usuario._id);
-      // Recargar historial desde el inicio después de una transacción
-      setPagina(1);
-      setHasMore(true);
-      setHistorial([]);
-      await obtenerHistorialTransacciones(usuario._id, 1, false);
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const copiarAlPortapapeles = () => {
-    if (userId) {
-      navigator.clipboard
-        .writeText(userId)
-        .then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        })
-        .catch((err) => {
-          console.error("Error al copiar: ", err);
-        });
-    }
-  };
-
-  const obtenerTamañoFuenteSaldo = (saldo) => {
-    const longitud = saldo.toString().length;
-    return `${Math.max(2.5 - longitud * 0.1, 1.2)}rem`;
-  };
-
-  // Filtrar transacciones localmente solo por tipo (ingresos/gastos)
-  const filtrarTransacciones = () => {
-    let transaccionesFiltradas = [...(historial || [])];
-
-    if (filtro !== "todos") {
-      transaccionesFiltradas = transaccionesFiltradas.filter((t) => {
-        if (filtro === "ingresos") {
-          return t.tipo === "recarga" || t.tipo === "recibido";
-        }
-        if (filtro === "gastos") {
-          return t.tipo === "retiro" || t.tipo === "envio";
-        }
-        return true;
-      });
-    }
-
-    return transaccionesFiltradas;
-  };
-
-  const formatearFecha = (fechaISO) => {
-    const opciones = { day: "2-digit", month: "short", year: "numeric" };
-    return new Date(fechaISO).toLocaleDateString("es-ES", opciones);
-  };
-
-  const formatearHora = (fechaISO) => {
-    return new Date(fechaISO).toLocaleTimeString("es-ES", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  if (loading || loadingTasa) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-white">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin mx-auto text-blue-500" />
-          <p className="mt-4">Cargando información de tu billetera...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const transaccionesFiltradas = filtrarTransacciones();
+  // ... (el resto del código permanece igual)
 
   return (
     <div className="min-h-screen flex flex-col text-white">
@@ -483,8 +173,9 @@ export default function WalletApp() {
                     <ArrowUpRight className="h-4 w-4" />
                     Enviar
                   </button>
+                  {/* Cambio aquí: usar handleRetirarClick en lugar de setShowRetirarModal */}
                   <button
-                    onClick={() => setShowRetirarModal(true)}
+                    onClick={handleRetirarClick}
                     className="bg-purple-600/90 hover:bg-purple-700 text-white py-3 px-4 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors shadow-md"
                   >
                     <ArrowDownLeft className="h-4 w-4" />
@@ -494,152 +185,7 @@ export default function WalletApp() {
               </div>
             </div>
 
-            <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg flex items-center gap-2">
-                  <ArrowUpRight className="h-5 w-5 text-gray-400" />
-                  Historial de transacciones
-                </h3>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">
-                    {historial.length} transacciones cargadas
-                  </span>
-                  <button
-                    onClick={() =>
-                      setFiltro(
-                        filtro === "todos"
-                          ? "ingresos"
-                          : filtro === "ingresos"
-                          ? "gastos"
-                          : "todos"
-                      )
-                    }
-                    className="flex items-center gap-1 text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full transition-colors"
-                  >
-                    <Filter className="h-4 w-4" />
-                    <span>
-                      {filtro === "todos"
-                        ? "Todos"
-                        : filtro === "ingresos"
-                        ? "Ingresos"
-                        : "Gastos"}
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Barra de búsqueda */}
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar transacciones..."
-                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      setPagina(1);
-                      setHasMore(true);
-                      setHistorial([]);
-                      obtenerHistorialTransacciones(userId, 1, false);
-                    }
-                  }}
-                />
-              </div>
-
-              {/* Lista de transacciones */}
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {loadingHistorial && pagina === 1 ? (
-                  <div className="text-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-blue-500" />
-                    <p className="text-gray-400 mt-2">Cargando transacciones...</p>
-                  </div>
-                ) : transaccionesFiltradas.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 bg-gray-700/30 rounded-lg">
-                    <p>No se encontraron transacciones</p>
-                  </div>
-                ) : (
-                  <>
-                    {transaccionesFiltradas.map((transaccion) => (
-                      <div
-                        key={transaccion._id}
-                        className="bg-gray-700/50 hover:bg-gray-700/70 rounded-lg p-4 border border-gray-600/30 transition-colors"
-                      >
-                        <div className="flex flex-col">
-                          <h4 className="font-medium">
-                            {transaccion.descripcion}
-                          </h4>
-                          <p className="text-gray-400 text-xs mt-1">
-                            {formatearFecha(transaccion.fecha)} ·{" "}
-                            {formatearHora(transaccion.fecha)}
-                          </p>
-                          <p
-                            className={`font-semibold text-lg ${
-                              transaccion.tipo === "retiro" ||
-                              transaccion.tipo === "envio"
-                                ? "text-red-400"
-                                : "text-green-400"
-                            }`}
-                          >
-                            {transaccion.tipo === "retiro" ||
-                            transaccion.tipo === "envio"
-                              ? "-"
-                              : "+"}{" "}
-                            COP{" "}
-                            {transaccion.monto.toLocaleString("es-CO", {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </p>
-                        </div>
-                        {transaccion.notas && (
-                          <p className="text-gray-400 text-sm mt-2 italic">
-                            "{transaccion.notas}"
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-
-              {/* Botón para cargar más transacciones */}
-              {hasMore && historial.length > 0 && (
-                <div className="mt-4 flex justify-center">
-                  <button
-                    onClick={cargarMasTransacciones}
-                    disabled={loadingMore}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors"
-                  >
-                    {loadingMore ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Cargando...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="h-4 w-4" />
-                        Cargar más transacciones
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-
-              {/* Mensaje cuando no hay más transacciones */}
-              {!hasMore && historial.length > 0 && (
-                <div className="mt-4 text-center text-gray-500 text-sm">
-                  No hay más transacciones para mostrar
-                </div>
-              )}
-
-              {/* Información de paginación */}
-              <div className="mt-2 text-center text-xs text-gray-400">
-                Página {pagina} • {historial.length} transacciones cargadas
-                {hasMore && " • Hay más transacciones disponibles"}
-              </div>
-            </div>
+            {/* ... (el resto del código del historial permanece igual) */}
           </>
         )}
       </main>
@@ -662,6 +208,44 @@ export default function WalletApp() {
           onRetirar={handleRetirarDinero}
         />
       )}
+
+      {/* Nuevo Modal de Restricción */}
+      {showRestriccionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-xl max-w-sm w-full p-6 border border-gray-700">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-500/20 mb-4">
+                <svg 
+                  className="h-6 w-6 text-yellow-500" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" 
+                  />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">
+                Función No Disponible
+              </h3>
+              <p className="text-gray-300 mb-6">
+                Esta opción solo está habilitada para comercios registrados.
+              </p>
+              <button
+                onClick={closeRestriccionModal}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <br />
       <br />
       <MobileNav billeteraActiva={billeteraActiva} />
