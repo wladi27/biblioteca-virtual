@@ -7,7 +7,7 @@ export const Home = () => {
   const serviceDetails = {
     serviceName: "Pro Plan",
     dueDate: "06/18/2025",
-    amountDue: "$20.00",
+    amountDue: "$85",
     supportEmail: "support@company.com",
     supportPhone: "+1 (800) 123-4567"
   };
