@@ -6,7 +6,7 @@ export const Home = () => {
   // Simulated data that could come from props or context
   const serviceDetails = {
     serviceName: "Pro Plan",
-    dueDate: "06/18/2025",
+    dueDate: "01/27/2026",
     amountDue: "$85",
     supportEmail: "support@company.com",
     supportPhone: "+1 (800) 123-4567"
@@ -64,7 +64,7 @@ export const Home = () => {
               alt="Company Logo"
               className="w-6 h-6 mr-2"
             />
-            <span className="text-gray-400 text-sm">© 2025 Vercel</span>
+            <span className="text-gray-400 text-sm">© 2026 Vercel</span>
           </div>
         </div>
       </div>
