@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FaExclamationTriangle } from 'react-icons/fa';
-import { MdPayment } from 'react-icons/md';
+import { MdPayment, MdInfo } from 'react-icons/md';
 
 export const Home = () => {
   // Simulated data that could come from props or context
@@ -12,9 +12,16 @@ export const Home = () => {
     supportPhone: "+1 (800) 123-4567"
   };
 
+  const [showPaymentInfo, setShowPaymentInfo] = useState(false);
+
   const handlePaymentClick = () => {
-    // Redirect to payment portal
-    window.location.href = "https://vercel.com/pricing";
+    // Show payment information instead of redirecting
+    setShowPaymentInfo(true);
+    
+    // Hide the message after 5 seconds
+    setTimeout(() => {
+      setShowPaymentInfo(false);
+    }, 5000);
   };
 
   return (
@@ -46,6 +53,23 @@ export const Home = () => {
               <span className="text-red-400 font-bold text-lg">{serviceDetails.amountDue}</span>
             </div>
           </div>
+
+          {/* Payment Information Alert */}
+          {showPaymentInfo && (
+            <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 animate-fadeIn">
+              <div className="flex items-start">
+                <MdInfo className="text-blue-400 text-xl mt-0.5 mr-3 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-blue-300 mb-1">Payment Instructions</h3>
+                  <p className="text-gray-300 text-sm">
+                    Please make your payment from your user account dashboard. 
+                    Navigate to <span className="font-semibold text-white">Billing → Payment Methods</span> 
+                    to complete your payment and restore service.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <button
             onClick={handlePaymentClick}
