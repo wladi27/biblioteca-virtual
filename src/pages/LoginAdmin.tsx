@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Background } from '../components/Background';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
 
 export const LoginAdmin = () => {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ export const LoginAdmin = () => {
   });
   const [message, setMessage] = useState({ text: '', type: '' });
   const [showPassword, setShowPassword] = useState(false);
+  const loginUser = useAuthStore((state) => state.login);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,7 +28,7 @@ export const LoginAdmin = () => {
 
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem('token', data.token);
+        loginUser(data.token);
         setMessage({ text: 'Inicio de sesión exitoso. Redirigiendo...', type: 'success' });
 
         setTimeout(() => {
