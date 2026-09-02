@@ -29,7 +29,6 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { initSocket, disconnectSocket } from './socket';
 import { useAuthStore } from './store/authStore';
 import { BilleterasFaltantes } from './pages/BilleterasFaltantes';
-{/* import ServiceSuspendedNotice from './pages/Suspen'; */}
 
 function App() {
   const token = useAuthStore((state) => state.token);
@@ -47,19 +46,24 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* <Route path="/" element={<ServiceSuspendedNotice />} /> */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/terminos-y-condiciones" element={<Terminos/>} />
         <Route path="/BV/auth/login" element={<LoginAdmin />} />
 
+        {/* Rutas Protegidas de Usuarios */}
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/billetera" element={<WalletApp />} />
           <Route path="/perfil" element={<Perfil/>} />
           <Route path="/red" element={<Red/>} />
           <Route path="/comisiones" element={<Comisiones/>} />
+          <Route path="/referidos-directos" element={<ReferidosDirectos />} />
+        </Route>
+
+        {/* Rutas Protegidas Exclusivas de Administrador */}
+        <Route element={<ProtectedRoute adminOnly />}>
           <Route path="/BV/dashboard" element={<Admin />} />
           <Route path="/BV/red" element={<RedAdmin />} />
           <Route path="/BV/perfil" element={<PerfilAdmin />} />
@@ -74,7 +78,6 @@ function App() {
           <Route path="/BV/aportes" element={<TotalApprovedContributions />} />
           <Route path="/BV/descargar-datos" element={<DescargarDatosPage />} />
           <Route path="/BV/restaurar-password" element={<CambiarContrasena />} /> 
-          <Route path="/referidos-directos" element={<ReferidosDirectos />} />
           <Route path="/admin/billeteras-faltantes" element={<BilleterasFaltantes />} />
         </Route>
       </Routes>

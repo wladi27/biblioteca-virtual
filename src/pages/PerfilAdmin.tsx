@@ -1,9 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Background } from '../components/Background';
-import { MobileNav } from '../components/MobileNav';
-import { FaSignOutAlt, FaMoneyBillWave, FaKey, FaDownload, FaUserEdit } from 'react-icons/fa';
 import { AdminNav } from '../components/AdminNav';
+import { 
+  ShieldCheck, 
+  User, 
+  Edit3, 
+  DollarSign, 
+  Wallet, 
+  TrendingUp, 
+  KeyRound, 
+  Download, 
+  LogOut, 
+  CheckCircle2, 
+  Users, 
+  X, 
+  Search, 
+  Loader2, 
+  Save, 
+  Layers,
+  ArrowUpRight,
+  Shield,
+  FileSpreadsheet
+} from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
 
 export const PerfilAdmin = () => {
   const [username, setUsername] = useState('');
@@ -13,342 +33,486 @@ export const PerfilAdmin = () => {
   const [editUserData, setEditUserData] = useState<any>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
+  const [editSuccess, setEditSuccess] = useState('');
   const navigate = useNavigate();
+
+  const getHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    };
+  };
+
+  const getApiUrl = () => {
+    return import.meta.env.VITE_URL_LOCAL || import.meta.env.VITE_API_URL || 'http://localhost:5005';
+  };
 
   useEffect(() => {
     const usuario = localStorage.getItem('usuario');
     if (usuario) {
-      const userData = JSON.parse(usuario);
-      setUsername(userData.nombre_completo);
+      try {
+        const userData = JSON.parse(usuario);
+        setUsername(userData.nombre_completo || userData.nombre_usuario || 'Super-Administrador');
+      } catch (e) {
+        console.error(e);
+      }
     }
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('usuario');
-    localStorage.removeItem('token');
+    setShowLogoutModal(false);
+    useAuthStore.getState().logout();
     navigate('/BV/auth/login');
   };
 
   const handleEditUserSearch = async () => {
+    if (!editUserId.trim()) return;
     setEditLoading(true);
     setEditError('');
+    setEditSuccess('');
     setEditUserData(null);
     try {
-      const res = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${editUserId}`);
-      if (!res.ok) throw new Error('Usuario no encontrado');
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/usuarios/${editUserId.trim()}`, { headers: getHeaders() });
+      if (!res.ok) throw new Error('Usuario no encontrado con ese ID.');
       const data = await res.json();
       setEditUserData(data);
     } catch (err: any) {
       setEditError(err.message || 'Error al buscar usuario');
+    } finally {
+      setEditLoading(false);
     }
-    setEditLoading(false);
   };
 
   const handleEditUserChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEditUserData({ ...editUserData, [e.target.name]: e.target.value });
   };
 
-  const handleEditUserSave = async () => {
+  const handleEditUserSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setEditLoading(true);
     setEditError('');
+    setEditSuccess('');
     try {
-      const res = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/usuario/${editUserId}`, {
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/api/usuario/${editUserId.trim()}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify(editUserData),
       });
-      if (!res.ok) throw new Error('Error al guardar cambios');
-      setShowEditModal(false);
+      if (!res.ok) throw new Error('Error al guardar los cambios del usuario');
+      setEditSuccess('¡Usuario actualizado exitosamente!');
+      setTimeout(() => {
+        setShowEditModal(false);
+        setEditSuccess('');
+      }, 1500);
     } catch (err: any) {
       setEditError(err.message || 'Error al guardar');
+    } finally {
+      setEditLoading(false);
     }
-    setEditLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex flex-col text-white bg-gradient-to-br from-gray-900 via-gray-800 to-blue-900">
+    <div className="min-h-screen bg-[#06110D] text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-white">
       <Background />
-      <AdminNav />
 
-      <div className="w-full max-w-3xl mx-auto px-4 py-16 flex-grow bg-opacity-80 bg-gray-900 rounded-2xl shadow-2xl md:min-w-[400px]">
-        <div className="flex flex-col items-center mb-10">
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center shadow-lg mb-4">
-            <span className="text-4xl font-bold text-white">{username ? username[0] : '?'}</span>
-          </div>
-          <h1 className="text-3xl font-extrabold mb-1 text-blue-300 drop-shadow">{username || 'Perfil Admin'}</h1>
-          <span className="text-blue-100 text-lg">Administrador</span>
-        </div>
-        <hr className="mb-8 border-blue-700" />
-
-        <div className="grid grid-cols-1 gap-6">
-          {/* Tarjeta de Editar Usuario */}
-          <div
-            className="bg-gradient-to-r from-blue-800 to-blue-600 p-6 rounded-xl shadow-md flex items-center cursor-pointer hover:scale-[1.03] transition-transform border border-blue-500"
-            onClick={() => setShowEditModal(true)}
-          >
-            <FaUserEdit className="text-3xl mr-4 text-blue-200" />
-            <div>
-              <h2 className="text-xl font-semibold text-white">Editar Usuario</h2>
-              <p className="text-blue-200 text-sm">Modifica la información de un usuario</p>
-            </div>
-          </div>
-
-          {/* Tarjeta de Comisiones */}
-          <div
-            className="bg-gradient-to-r from-blue-800 to-blue-600 p-6 rounded-xl shadow-md flex items-center cursor-pointer hover:scale-[1.03] transition-transform border border-blue-500"
-            onClick={() => navigate('/BV/comisiones')}
-          >
-            <FaMoneyBillWave className="text-3xl mr-4 text-blue-200" />
-            <div>
-              <h2 className="text-xl font-semibold text-white">Comisiones</h2>
-              <p className="text-blue-200 text-sm">Gestiona los niveles y comisiones</p>
-            </div>
-          </div>
-
-          {/* Tarjeta de Recarga */}
-          <div
-            className="bg-gradient-to-r from-blue-800 to-blue-600 p-6 rounded-xl shadow-md flex items-center cursor-pointer hover:scale-[1.03] transition-transform border border-blue-500"
-            onClick={() => navigate('/BV/recarga')}
-          >
-            <FaMoneyBillWave className="text-3xl mr-4 text-blue-200" />
-            <div>
-              <h2 className="text-xl font-semibold text-white">Recargar Billetera</h2>
-              <p className="text-blue-200 text-sm">Recarga saldo a usuarios</p>
-            </div>
-          </div>
-
-          {/* Tarjeta de Recarga Masiva*/}
-          <div
-            className="bg-gradient-to-r from-blue-800 to-blue-600 p-6 rounded-xl shadow-md flex items-center cursor-pointer hover:scale-[1.03] transition-transform border border-blue-500"
-            onClick={() => navigate('/BV/recarga-masiva')}
-          >
-            <FaMoneyBillWave className="text-3xl mr-4 text-blue-200" />
-            <div>
-              <h2 className="text-xl font-semibold text-white">Recarga Masiva</h2>
-              <p className="text-blue-200 text-sm">Recarga múltiple de billeteras</p>
-            </div>
-          </div>
-
-           {/* Tarjeta de Recarga Billeteras Faltantes*/}
-          <div
-            className="bg-gradient-to-r from-blue-800 to-blue-600 p-6 rounded-xl shadow-md flex items-center cursor-pointer hover:scale-[1.03] transition-transform border border-blue-500"
-            onClick={() => navigate('/admin/billeteras-faltantes')}
-          >
-            <FaMoneyBillWave className="text-3xl mr-4 text-blue-200" />
-            <div>
-              <h2 className="text-xl font-semibold text-white">Billeteras Faltantes</h2>
-              <p className="text-blue-200 text-sm">Gestiona billeteras sin recargar</p>
-            </div>
-          </div>
-
-          {/* Tarjeta de Resetear contraseña de usuario */}
-          <div
-            className="bg-gradient-to-r from-blue-800 to-blue-600 p-6 rounded-xl shadow-md flex items-center cursor-pointer hover:scale-[1.03] transition-transform border border-blue-500"
-            onClick={() => navigate('/BV/restaurar-password')}
-          >
-            <FaKey className="text-3xl mr-4 text-blue-200" />
-            <div>
-              <h2 className="text-xl font-semibold text-white">Restaurar Contraseña</h2>
-              <p className="text-blue-200 text-sm">Restablece la contraseña de un usuario</p>
-            </div>
-          </div>
-
-          {/* Tarjeta de Descargar Datos */}
-          <div
-            className="bg-gradient-to-r from-blue-800 to-blue-600 p-6 rounded-xl shadow-md flex items-center cursor-pointer hover:scale-[1.03] transition-transform border border-blue-500"
-            onClick={() => navigate('/BV/descargar-datos')}
-          >
-            <FaDownload className="text-3xl mr-4 text-blue-200" />
-            <div>
-              <h2 className="text-xl font-semibold text-white">Descargar Datos</h2>
-              <p className="text-blue-200 text-sm">Exporta información relevante</p>
-            </div>
-          </div>
-
-          {/* Tarjeta de Cerrar Sesión */}
-          <div
-            className="bg-gradient-to-r from-blue-800 to-blue-600 p-6 rounded-xl shadow-md flex items-center cursor-pointer hover:scale-[1.03] transition-transform border border-blue-500"
-            onClick={() => setShowLogoutModal(true)}
-          >
-            <FaSignOutAlt className="text-3xl mr-4 text-blue-200" />
-            <div>
-              <h2 className="text-xl font-semibold text-white">Cerrar Sesión</h2>
-              <p className="text-blue-200 text-sm">Salir del panel de administración</p>
-            </div>
-          </div>
-        </div>
-        <br /><br />
-
-        {showLogoutModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-            <div className="bg-gray-900 p-8 rounded-2xl shadow-2xl text-center border-2 border-blue-700">
-              <h2 className="text-xl font-semibold mb-4 text-blue-200">¿Estás seguro de que deseas cerrar sesión?</h2>
-              <div className="flex justify-center gap-4">
-                <button
-                  className="bg-red-600 text-white py-2 px-6 rounded-md hover:bg-red-700 transition-colors font-bold"
-                  onClick={handleLogout}
-                >
-                  Sí, cerrar sesión
-                </button>
-                <button
-                  className="bg-gray-600 text-white py-2 px-6 rounded-md hover:bg-gray-700 transition-colors font-bold"
-                  onClick={() => setShowLogoutModal(false)}
-                >
-                  Cancelar
-                </button>
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 flex-grow w-full">
+        {/* Cabecera del Perfil de Administrador */}
+        <div className="relative rounded-3xl p-6 sm:p-8 mb-8 overflow-hidden border border-emerald-500/25 bg-gradient-to-r from-[#0B251B] via-[#091F17] to-[#071711] shadow-2xl shadow-emerald-950/40">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-slate-950 font-extrabold text-2xl sm:text-3xl font-mono shadow-xl shadow-emerald-500/20 shrink-0">
+                {username ? username.charAt(0).toUpperCase() : 'A'}
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs uppercase tracking-wider font-semibold text-emerald-400 font-mono">
+                    @{username || 'admin'}
+                  </span>
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                    <Shield className="h-3 w-3" />
+                    <span>Super-Administrador</span>
+                  </span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-heading">
+                  {username || 'Administrador'}
+                </h1>
+                <p className="text-xs text-slate-400 mt-1">
+                  Acceso con privilegios totales sobre la plataforma Granja Raíz de Vida
+                </p>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Modal de edición */}
-        {showEditModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-            <div className="bg-gray-900 p-8 rounded-2xl shadow-2xl text-center border-2 border-blue-700 w-full max-w-lg max-h-[90vh] flex flex-col">
-              <h2 className="text-xl font-semibold mb-4 text-blue-200">Editar Usuario</h2>
-              {!editUserData ? (
-                <>
+            <button
+              onClick={() => setShowLogoutModal(true)}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/35 text-rose-300 hover:text-white hover:bg-rose-500/25 hover:border-rose-500/50 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 shrink-0"
+            >
+              <LogOut className="h-4 w-4 text-rose-400" />
+              <span>Cerrar Sesión</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Módulos y Herramientas Administrativas */}
+        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 font-heading">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block"></span>
+          Herramientas de Gestión y Configuración
+        </h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          {/* 1. Editar Usuario */}
+          <div
+            onClick={() => {
+              setShowEditModal(true);
+              setEditUserId('');
+              setEditUserData(null);
+              setEditError('');
+              setEditSuccess('');
+            }}
+            className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 hover:border-emerald-500/45 hover:bg-[#0D2018] transition-all cursor-pointer group shadow-lg flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-transform">
+                <Edit3 className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-sm">Editar Inversionista</p>
+                <p className="text-xs text-slate-400">Modificar datos de cualquier usuario</p>
+              </div>
+            </div>
+            <ArrowUpRight className="h-4 w-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+          </div>
+
+          {/* 2. Validar Aportes */}
+          <Link
+            to="/BV/validar"
+            className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 hover:border-emerald-500/45 hover:bg-[#0D2018] transition-all group shadow-lg flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-transform">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-sm">Validar Aportes</p>
+                <p className="text-xs text-slate-400">Aprobar solicitudes pendientes</p>
+              </div>
+            </div>
+            <ArrowUpRight className="h-4 w-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+          </Link>
+
+          {/* 3. Recarga Masiva */}
+          <Link
+            to="/BV/recarga-masiva"
+            className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 hover:border-emerald-500/45 hover:bg-[#0D2018] transition-all group shadow-lg flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-transform">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-sm">Recarga Masiva Diaria</p>
+                <p className="text-xs text-slate-400">Abonos y rendimientos programados</p>
+              </div>
+            </div>
+            <ArrowUpRight className="h-4 w-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+          </Link>
+
+          {/* 4. Comisiones */}
+          <Link
+            to="/BV/comisiones"
+            className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 hover:border-emerald-500/45 hover:bg-[#0D2018] transition-all group shadow-lg flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-transform">
+                <DollarSign className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-sm">Planes de Compensación</p>
+                <p className="text-xs text-slate-400">Gestionar tablas de pagos por rango</p>
+              </div>
+            </div>
+            <ArrowUpRight className="h-4 w-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+          </Link>
+
+          {/* 5. Recargar Billetera Individual */}
+          <Link
+            to="/BV/recarga"
+            className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 hover:border-emerald-500/45 hover:bg-[#0D2018] transition-all group shadow-lg flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-transform">
+                <Wallet className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-sm">Recargar Billetera</p>
+                <p className="text-xs text-slate-400">Abonar saldo a socio individual</p>
+              </div>
+            </div>
+            <ArrowUpRight className="h-4 w-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+          </Link>
+
+          {/* 6. Billeteras Faltantes */}
+          <Link
+            to="/admin/billeteras-faltantes"
+            className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 hover:border-emerald-500/45 hover:bg-[#0D2018] transition-all group shadow-lg flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-transform">
+                <Layers className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-sm">Billeteras Faltantes</p>
+                <p className="text-xs text-slate-400">Control de billeteras pendientes</p>
+              </div>
+            </div>
+            <ArrowUpRight className="h-4 w-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+          </Link>
+
+          {/* 7. Resetear Contraseñas */}
+          <Link
+            to="/BV/restaurar-password"
+            className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 hover:border-emerald-500/45 hover:bg-[#0D2018] transition-all group shadow-lg flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-transform">
+                <KeyRound className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-sm">Restaurar Contraseñas</p>
+                <p className="text-xs text-slate-400">Soporte y desbloqueo de acceso</p>
+              </div>
+            </div>
+            <ArrowUpRight className="h-4 w-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+          </Link>
+
+          {/* 8. Descargar Reportes */}
+          <Link
+            to="/BV/descargar-datos"
+            className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 hover:border-emerald-500/45 hover:bg-[#0D2018] transition-all group shadow-lg flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-transform">
+                <FileSpreadsheet className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-sm">Descargar Reportes</p>
+                <p className="text-xs text-slate-400">Exportar base de datos a Excel/CSV</p>
+              </div>
+            </div>
+            <ArrowUpRight className="h-4 w-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+          </Link>
+
+          {/* 9. Red Global */}
+          <Link
+            to="/BV/red"
+            className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 hover:border-emerald-500/45 hover:bg-[#0D2018] transition-all group shadow-lg flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-transform">
+                <Users className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-sm">Red Global de Inversión</p>
+                <p className="text-xs text-slate-400">Inspeccionar matriz de 12 niveles</p>
+              </div>
+            </div>
+            <ArrowUpRight className="h-4 w-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+          </Link>
+        </div>
+      </main>
+
+      {/* MODAL: Editar Usuario */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#0A1812] border border-emerald-500/30 rounded-3xl max-w-lg w-full shadow-2xl p-6 sm:p-7 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5 pb-3 border-b border-emerald-500/20">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
+                  <Edit3 className="h-5 w-5" />
+                </div>
+                <h3 className="text-lg font-bold text-white font-heading">Editar Inversionista</h3>
+              </div>
+              <button 
+                onClick={() => setShowEditModal(false)}
+                className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Buscador de usuario por ID */}
+            <div className="flex gap-2 mb-5">
+              <input
+                type="text"
+                placeholder="ID del usuario a modificar..."
+                value={editUserId}
+                onChange={(e) => setEditUserId(e.target.value)}
+                className="flex-1 p-2.5 bg-slate-900/90 border border-emerald-500/20 rounded-xl text-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <button
+                type="button"
+                onClick={handleEditUserSearch}
+                disabled={editLoading || !editUserId.trim()}
+                className="px-4 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 font-bold text-xs rounded-xl transition-colors disabled:opacity-50"
+              >
+                {editLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Buscar'}
+              </button>
+            </div>
+
+            {editError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs">
+                {editError}
+              </div>
+            )}
+
+            {editSuccess && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs">
+                {editSuccess}
+              </div>
+            )}
+
+            {editUserData && (
+              <form onSubmit={handleEditUserSave} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre Completo</label>
                   <input
-                    className="w-full mb-4 p-2 rounded bg-gray-800 text-white border border-blue-500"
-                    placeholder="ID del usuario"
-                    value={editUserId}
-                    onChange={e => setEditUserId(e.target.value)}
-                    disabled={editLoading}
-                  />
-                  <button
-                    className="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700 transition-colors font-bold"
-                    onClick={handleEditUserSearch}
-                    disabled={editLoading || !editUserId}
-                  >
-                    {editLoading ? 'Buscando...' : 'Buscar'}
-                  </button>
-                  {editError && <p className="text-red-400 mt-2">{editError}</p>}
-                </>
-              ) : (
-                <form
-                  className="flex flex-col gap-3 overflow-y-auto"
-                  style={{ maxHeight: '60vh' }}
-                  onSubmit={e => {
-                    e.preventDefault();
-                    handleEditUserSave();
-                  }}
-                >
-                  <label className="text-left text-blue-200 font-semibold" htmlFor="nombre_completo">Nombre completo</label>
-                  <input
-                    id="nombre_completo"
-                    className="p-2 rounded bg-gray-800 text-white border border-blue-500"
+                    type="text"
                     name="nombre_completo"
                     value={editUserData.nombre_completo || ''}
                     onChange={handleEditUserChange}
-                    placeholder="Nombre completo"
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/20 text-white text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
+                </div>
 
-                  <label className="text-left text-blue-200 font-semibold" htmlFor="linea_llamadas">Línea de llamadas</label>
-                  <input
-                    id="linea_llamadas"
-                    className="p-2 rounded bg-gray-800 text-white border border-blue-500"
-                    name="linea_llamadas"
-                    value={editUserData.linea_llamadas || ''}
-                    onChange={handleEditUserChange}
-                    placeholder="Línea de llamadas"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre de Usuario</label>
+                    <input
+                      type="text"
+                      name="nombre_usuario"
+                      value={editUserData.nombre_usuario || ''}
+                      onChange={handleEditUserChange}
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/20 text-white text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">DNI / Documento</label>
+                    <input
+                      type="text"
+                      name="dni"
+                      value={editUserData.dni || ''}
+                      onChange={handleEditUserChange}
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/20 text-white text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
 
-                  <label className="text-left text-blue-200 font-semibold" htmlFor="linea_whatsapp">Línea WhatsApp</label>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Correo Electrónico</label>
                   <input
-                    id="linea_whatsapp"
-                    className="p-2 rounded bg-gray-800 text-white border border-blue-500"
-                    name="linea_whatsapp"
-                    value={editUserData.linea_whatsapp || ''}
-                    onChange={handleEditUserChange}
-                    placeholder="Línea WhatsApp"
-                  />
-
-                  <label className="text-left text-blue-200 font-semibold" htmlFor="cuenta_numero">Cuenta número</label>
-                  <input
-                    id="cuenta_numero"
-                    className="p-2 rounded bg-gray-800 text-white border border-blue-500"
-                    name="cuenta_numero"
-                    value={editUserData.cuenta_numero || ''}
-                    onChange={handleEditUserChange}
-                    placeholder="Cuenta número"
-                  />
-
-                  <label className="text-left text-blue-200 font-semibold" htmlFor="banco">Banco</label>
-                  <input
-                    id="banco"
-                    className="p-2 rounded bg-gray-800 text-white border border-blue-500"
-                    name="banco"
-                    value={editUserData.banco || ''}
-                    onChange={handleEditUserChange}
-                    placeholder="Banco"
-                  />
-
-                  <label className="text-left text-blue-200 font-semibold" htmlFor="titular_cuenta">Titular de la cuenta</label>
-                  <input
-                    id="titular_cuenta"
-                    className="p-2 rounded bg-gray-800 text-white border border-blue-500"
-                    name="titular_cuenta"
-                    value={editUserData.titular_cuenta || ''}
-                    onChange={handleEditUserChange}
-                    placeholder="Titular de la cuenta"
-                  />
-
-                  <label className="text-left text-blue-200 font-semibold" htmlFor="correo_electronico">Correo electrónico</label>
-                  <input
-                    id="correo_electronico"
-                    className="p-2 rounded bg-gray-800 text-white border border-blue-500"
+                    type="email"
                     name="correo_electronico"
                     value={editUserData.correo_electronico || ''}
                     onChange={handleEditUserChange}
-                    placeholder="Correo electrónico"
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/20 text-white text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
+                </div>
 
-                  <label className="text-left text-blue-200 font-semibold" htmlFor="dni">DNI</label>
-                  <input
-                    id="dni"
-                    className="p-2 rounded bg-gray-800 text-white border border-blue-500"
-                    name="dni"
-                    value={editUserData.dni || ''}
-                    onChange={handleEditUserChange}
-                    placeholder="DNI"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Teléfono Llamadas</label>
+                    <input
+                      type="text"
+                      name="linea_llamadas"
+                      value={editUserData.linea_llamadas || ''}
+                      onChange={handleEditUserChange}
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/20 text-white text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">WhatsApp</label>
+                    <input
+                      type="text"
+                      name="linea_whatsapp"
+                      value={editUserData.linea_whatsapp || ''}
+                      onChange={handleEditUserChange}
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/20 text-white text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
 
-                  <label className="text-left text-blue-200 font-semibold" htmlFor="nombre_usuario">Nombre de usuario</label>
-                  <input
-                    id="nombre_usuario"
-                    className="p-2 rounded bg-gray-800 text-white border border-blue-500"
-                    name="nombre_usuario"
-                    value={editUserData.nombre_usuario || ''}
-                    onChange={handleEditUserChange}
-                    placeholder="Nombre de usuario"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Banco</label>
+                    <input
+                      type="text"
+                      name="banco"
+                      value={editUserData.banco || ''}
+                      onChange={handleEditUserChange}
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/20 text-white text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Número de Cuenta</label>
+                    <input
+                      type="text"
+                      name="cuenta_numero"
+                      value={editUserData.cuenta_numero || ''}
+                      onChange={handleEditUserChange}
+                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/20 text-white text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
 
+                <div className="pt-3">
                   <button
-                    className="bg-green-600 text-white py-2 px-6 rounded-md hover:bg-green-700 transition-colors font-bold mt-2"
                     type="submit"
                     disabled={editLoading}
+                    className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold rounded-xl text-xs transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
                   >
-                    {editLoading ? 'Guardando...' : 'Guardar Cambios'}
+                    {editLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    <span>Guardar Cambios</span>
                   </button>
-                  {editError && <p className="text-red-400 mt-2">{editError}</p>}
-                </form>
-              )}
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Cerrar Sesión */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#0A1812] border border-emerald-500/30 rounded-3xl max-w-sm w-full shadow-2xl p-6 sm:p-7 text-center">
+            <div className="h-14 w-14 rounded-2xl bg-rose-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto mb-3.5">
+              <LogOut className="h-7 w-7" />
+            </div>
+            <h3 className="text-xl font-bold text-white font-heading">¿Cerrar Sesión Admin?</h3>
+            <p className="text-xs text-slate-300 mt-1.5 mb-6 leading-relaxed">
+              Tu sesión de administración se cerrará de forma segura.
+            </p>
+            <div className="flex items-center gap-3">
               <button
-                className="mt-4 bg-gray-600 text-white py-2 px-6 rounded-md hover:bg-gray-700 transition-colors font-bold"
-                onClick={() => {
-                  setShowEditModal(false);
-                  setEditUserId('');
-                  setEditUserData(null);
-                  setEditError('');
-                }}
-                disabled={editLoading}
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 py-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-800 transition-colors"
               >
                 Cancelar
               </button>
+              <button
+                onClick={handleLogout}
+                className="flex-1 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-lg shadow-rose-600/30 active:scale-95"
+              >
+                Sí, Salir
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      <br /><br />
+      <AdminNav />
     </div>
   );
 };

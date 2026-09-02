@@ -1,918 +1,852 @@
 import React, { useEffect, useState } from 'react';
 import { Background } from '../components/Background';
-import { FaUserPlus, FaCheck, FaTimes, FaPaperPlane, FaUsers, FaCheckDouble, FaExclamationTriangle, FaWallet } from 'react-icons/fa';
 import { MobileNav } from '../components/MobileNav';
-import axios from 'axios';
-
-const Message = ({ message, type, onClose }) => {
-  if (!message) return null;
-
-  const baseClasses = 'p-4 rounded-md mb-4 flex justify-between items-center';
-  const typeClasses = {
-    success: 'bg-green-100 border border-green-400 text-green-700',
-    error: 'bg-red-100 border border-red-400 text-red-700',
-    warning: 'bg-yellow-100 border border-yellow-400 text-yellow-700',
-  };
-
-  return (
-    <div className={`${baseClasses} ${typeClasses[type]}`}>
-      <span>{message}</span>
-      <button onClick={onClose} className="ml-4">
-        <svg
-          className="w-5 h-5"
-          fill="currentColor"
-          viewBox="0 0 20 20"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            fillRule="evenodd"
-            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-            clipRule="evenodd"
-          />
-        </svg>
-      </button>
-    </div>
-  );
-};
+import { 
+  Users, 
+  UserPlus, 
+  CheckCircle2, 
+  Clock, 
+  AlertCircle, 
+  DollarSign, 
+  ShieldCheck, 
+  Clipboard, 
+  Check, 
+  Search, 
+  MessageCircle, 
+  Mail, 
+  Sparkles, 
+  CheckSquare, 
+  Square, 
+  Loader2, 
+  X, 
+  ArrowRight,
+  RefreshCw,
+  ChevronRight,
+  UserCheck
+} from 'lucide-react';
 
 export const ReferidosDirectos = () => {
-  const [activeTab, setActiveTab] = useState('recibidas');
-  const [solicitudesRecibidas, setSolicitudesRecibidas] = useState([]);
-  const [solicitudesEnviadas, setSolicitudesEnviadas] = useState([]);
+  const [activeTab, setActiveTab] = useState<'directos' | 'recibidas' | 'enviadas'>('directos');
+  const [referidosDirectos, setReferidosDirectos] = useState<any[]>([]);
+  const [solicitudesRecibidas, setSolicitudesRecibidas] = useState<any[]>([]);
+  const [solicitudesEnviadas, setSolicitudesEnviadas] = useState<any[]>([]);
+  const [resumenComisiones, setResumenComisiones] = useState<any>({
+    total_referidos: 0,
+    comisiones_pagadas_total: 0,
+    comisiones_pendientes_total: 0,
+    referidos_verificados: 0,
+    patrocinador_verificado: false
+  });
+  
   const [isLoading, setIsLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [referidoId, setReferidoId] = useState('');
-  const [userId, setUserId] = useState(null);
-  const [userData, setUserData] = useState(null);
-  const [message, setMessage] = useState({ text: '', type: '' });
-  const [selectedSolicitudes, setSelectedSolicitudes] = useState([]);
-  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
-  const [billeteraActiva, setBilleteraActiva] = useState(false);
-  const [verificandoBilletera, setVerificandoBilletera] = useState(true);
-  const [paginacionRecibidas, setPaginacionRecibidas] = useState({});
-  const [paginacionEnviadas, setPaginacionEnviadas] = useState({});
-  const [paginaActualRecibidas, setPaginaActualRecibidas] = useState(1);
-  const [paginaActualEnviadas, setPaginaActualEnviadas] = useState(1);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSweeping, setIsSweeping] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [referidoIdInput, setReferidoIdInput] = useState('');
+  const [userId, setUserId] = useState<string>('');
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const [selectedSolicitudes, setSelectedSolicitudes] = useState<Set<string>>(new Set());
+  const [isCopied, setIsCopied] = useState<Record<string, boolean>>({});
+  const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    const usuario = localStorage.getItem('usuario');
-    if (usuario) {
-      const user = JSON.parse(usuario);
-      setUserId(user._id);
-      setUserData(user);
-      verificarBilleteraUsuario(user._id);
-      fetchSolicitudes(user._id);
-    }
-  }, []);
-
-  // Función para verificar el estado de la billetera del usuario
-  const verificarBilleteraUsuario = async (usuarioId) => {
-    try {
-      setVerificandoBilletera(true);
-      const response = await axios.get(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/estado/${usuarioId}`);
-      setBilleteraActiva(response.data.activa);
-    } catch (error) {
-      console.error('Error al verificar billetera:', error);
-      setBilleteraActiva(false);
-      setMessage({ 
-        text: 'No se pudo verificar el estado de tu billetera', 
-        type: 'error' 
-      });
-    } finally {
-      setVerificandoBilletera(false);
-    }
+  const getHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    };
   };
 
-  const fetchSolicitudes = async (userId, pageRecibidas = 1, pageEnviadas = 1) => {
+  const getApiUrl = () => {
+    return import.meta.env.VITE_URL_LOCAL || import.meta.env.VITE_API_URL || 'http://localhost:5005';
+  };
+
+  const showToast = (text: string, type: 'success' | 'error' | 'warning' = 'success') => {
+    setMessage({ text, type });
+    setTimeout(() => setMessage(null), 4000);
+  };
+
+  const handleCopyToClipboard = (text: string, key: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      setIsCopied(prev => ({ ...prev, [key]: true }));
+      showToast('Copiado al portapapeles', 'success');
+      setTimeout(() => {
+        setIsCopied(prev => ({ ...prev, [key]: false }));
+      }, 2000);
+    }).catch(() => {
+      showToast('Error al copiar', 'error');
+    });
+  };
+
+  const fetchAllData = async (uId: string) => {
+    setIsLoading(true);
+    const apiUrl = getApiUrl();
+    const headers = getHeaders();
+
     try {
-      setIsLoading(true);
-      
-      // Para solicitudes recibidas, traer TODOS los estados
-      const [recibidas, enviadas] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/recibidas/${userId}?page=${pageRecibidas}&limit=10&estado=todos`),
-        axios.get(`${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/enviadas/${userId}?page=${pageEnviadas}&limit=10&estado=todos`)
+      const [resDirectos, resRecibidas, resEnviadas, resResumen] = await Promise.allSettled([
+        fetch(`${apiUrl}/api/referralRequests/referidos-directos/${uId}?limit=50`, { headers }).then(r => r.json()),
+        fetch(`${apiUrl}/api/referralRequests/recibidas/${uId}?estado=todos&limit=50`, { headers }).then(r => r.json()),
+        fetch(`${apiUrl}/api/referralRequests/enviadas/${uId}?estado=todos&limit=50`, { headers }).then(r => r.json()),
+        fetch(`${apiUrl}/api/referralRequests/resumen-comisiones/${uId}`, { headers }).then(r => r.json())
       ]);
-      
-      console.log('📥 Solicitudes recibidas:', recibidas.data.solicitudes);
-      console.log('📤 Solicitudes enviadas:', enviadas.data.solicitudes);
-      
-      setSolicitudesRecibidas(recibidas.data.solicitudes || []);
-      setSolicitudesEnviadas(enviadas.data.solicitudes || []);
-      setPaginacionRecibidas(recibidas.data.paginacion || {});
-      setPaginacionEnviadas(enviadas.data.paginacion || {});
+
+      if (resDirectos.status === 'fulfilled') {
+        setReferidosDirectos(resDirectos.value.referidos || []);
+      }
+      if (resRecibidas.status === 'fulfilled') {
+        setSolicitudesRecibidas(resRecibidas.value.solicitudes || []);
+      }
+      if (resEnviadas.status === 'fulfilled') {
+        setSolicitudesEnviadas(resEnviadas.value.solicitudes || []);
+      }
+      if (resResumen.status === 'fulfilled') {
+        setResumenComisiones(resResumen.value);
+      }
     } catch (error) {
-      console.error('Error al cargar solicitudes:', error);
-      setMessage({ 
-        text: 'Error al cargar solicitudes: ' + (error.response?.data?.message || error.message), 
-        type: 'error' 
-      });
+      console.error('Error fetching direct referrals:', error);
+      showToast('Error al conectar con el servidor', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCambiarPagina = (tab, nuevaPagina) => {
-    if (tab === 'recibidas') {
-      setPaginaActualRecibidas(nuevaPagina);
-      fetchSolicitudes(userId, nuevaPagina, paginaActualEnviadas);
-    } else {
-      setPaginaActualEnviadas(nuevaPagina);
-      fetchSolicitudes(userId, paginaActualRecibidas, nuevaPagina);
-    }
-  };
-
-  const handleCambiarEstado = async (solicitudId, nuevoEstado) => {
+  const handleSweepCommissions = async () => {
+    setIsSweeping(true);
     try {
-      await axios.patch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/${solicitudId}`,
-        { estado: nuevoEstado }
-      );
-
-      setMessage({ text: `Solicitud ${nuevoEstado}`, type: 'success' });
-      
-      // Recargar las solicitudes después de cambiar el estado
-      setTimeout(() => {
-        fetchSolicitudes(userId, paginaActualRecibidas, paginaActualEnviadas);
-      }, 500);
-      
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || 'Error al actualizar estado';
-      setMessage({ text: errorMessage, type: 'error' });
-      console.error('Error al cambiar estado:', error);
-    }
-  };
-
-  // Función para aceptar múltiples solicitudes (máximo 20)
-  const handleAceptarPorLote = async () => {
-    if (selectedSolicitudes.length === 0) {
-      setMessage({ text: 'Selecciona al menos una solicitud para aceptar', type: 'error' });
-      return;
-    }
-
-    // Verificar billetera activa
-    if (!billeteraActiva) {
-      setMessage({ 
-        text: 'Debes activar tu billetera primero para poder aceptar referidos.', 
-        type: 'error' 
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/api/referralRequests/liquidar-pendientes`, {
+        method: 'POST',
+        headers: getHeaders()
       });
-      return;
-    }
-
-    // Limitar a máximo 20 solicitudes por lote
-    const solicitudesAProcesar = selectedSolicitudes.slice(0, 20);
-    
-    if (selectedSolicitudes.length > 20) {
-      setMessage({ 
-        text: `Máximo 20 solicitudes por lote. Se procesarán las primeras 20.`, 
-        type: 'warning' 
-      });
-    }
-
-    setIsProcessingBatch(true);
-    try {
-      // Usar el nuevo endpoint de aceptación múltiple
-      const response = await axios.post(
-        `${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/aceptar-multiples`,
-        { solicitudesIds: solicitudesAProcesar }
-      );
-
-      const { resultados } = response.data;
-      
-      if (resultados.errores > 0) {
-        setMessage({ 
-          text: `Procesadas ${resultados.exitos} solicitudes exitosamente, ${resultados.errores} fallaron.`, 
-          type: 'warning'
-        });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Barrido completado: ${data.resultado?.liquidadas || 0} comisiones pagadas exitosamente.`, 'success');
+        if (userId) fetchAllData(userId);
       } else {
-        setMessage({ 
-          text: `Todas las ${resultados.exitos} solicitudes procesadas exitosamente`, 
-          type: 'success'
-        });
+        showToast(data.message || 'Error al ejecutar barrido', 'error');
       }
-      
-      // Limpiar selección y recargar datos
-      setSelectedSolicitudes([]);
-      
-      // Recargar las solicitudes después de un breve delay
-      setTimeout(() => {
-        fetchSolicitudes(userId, paginaActualRecibidas, paginaActualEnviadas);
-      }, 500);
-      
-    } catch (error) {
-      setMessage({ 
-        text: 'Error al procesar solicitudes por lote: ' + error.message, 
-        type: 'error' 
-      });
+    } catch (e) {
+      showToast('Error de conexión al liquidar comisiones', 'error');
     } finally {
-      setIsProcessingBatch(false);
+      setIsSweeping(false);
     }
   };
 
-  const handleCrearSolicitud = async (e) => {
+  const handleCambiarEstado = async (solicitudId: string, nuevoEstado: 'aceptado' | 'rechazado') => {
+    try {
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/api/referralRequests/${solicitudId}`, {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify({ estado: nuevoEstado })
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        showToast(data.message || `Solicitud ${nuevoEstado}`, 'success');
+        if (userId) fetchAllData(userId);
+      } else {
+        showToast(data.message || 'Error al procesar solicitud', 'error');
+      }
+    } catch (error) {
+      showToast('Error de conexión', 'error');
+    }
+  };
+
+  const handleAceptarPorLote = async () => {
+    if (selectedSolicitudes.size === 0) {
+      showToast('Selecciona al menos una solicitud para aceptar', 'warning');
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/api/referralRequests/aceptar-multiples`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ solicitudesIds: Array.from(selectedSolicitudes) })
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        showToast(data.message || 'Solicitudes procesadas exitosamente', 'success');
+        setSelectedSolicitudes(new Set());
+        if (userId) fetchAllData(userId);
+      } else {
+        showToast(data.message || 'Error en aceptación por lote', 'error');
+      }
+    } catch (error) {
+      showToast('Error de conexión', 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCrearSolicitud = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!referidoIdInput.trim() || !userId) return;
+
     try {
-      if (!referidoId) {
-        setMessage({ text: 'Por favor ingresa un ID de usuario válido', type: 'error' });
-        return;
-      }
-
-      if (userId === referidoId) {
-        setMessage({ text: 'No puedes referirte a ti mismo', type: 'error' });
-        return;
-      }
-
-      await axios.post(`${import.meta.env.VITE_URL_LOCAL}/api/referralRequests/`, {
-        solicitante_id: userId,
-        referido_id: referidoId
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/api/referralRequests`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          solicitante_id: userId,
+          referido_id: referidoIdInput.trim()
+        })
       });
+      const data = await res.json();
 
-      setMessage({ text: 'Solicitud creada exitosamente', type: 'success' });
-      setShowModal(false);
-      setReferidoId('');
-      
-      // Recargar las solicitudes después de crear una nueva
-      setTimeout(() => {
-        fetchSolicitudes(userId, paginaActualRecibidas, paginaActualEnviadas);
-      }, 500);
-      
+      if (res.ok) {
+        showToast('Referido vinculado con éxito', 'success');
+        setReferidoIdInput('');
+        setShowInviteModal(false);
+        fetchAllData(userId);
+      } else {
+        showToast(data.message || 'No se pudo vincular al referido', 'error');
+      }
     } catch (error) {
-      setMessage({ 
-        text: error.response?.data?.message || 'Error al crear solicitud', 
-        type: 'error' 
-      });
-      console.error('Error al crear solicitud:', error.response?.data || error);
+      showToast('Error al conectar con el servidor', 'error');
     }
   };
 
-  const handleCloseMessage = () => {
-    setMessage({ text: '', type: '' });
+  const toggleSelectSolicitud = (id: string) => {
+    setSelectedSolicitudes(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
-  // Función para seleccionar/deseleccionar solicitudes
-  const toggleSeleccionSolicitud = (solicitudId) => {
-    setSelectedSolicitudes(prev => 
-      prev.includes(solicitudId) 
-        ? prev.filter(id => id !== solicitudId)
-        : [...prev, solicitudId]
+  const toggleSelectAllRecibidas = () => {
+    const pendientes = solicitudesRecibidas.filter(s => s.estado === 'pendiente');
+    if (selectedSolicitudes.size === pendientes.length) {
+      setSelectedSolicitudes(new Set());
+    } else {
+      setSelectedSolicitudes(new Set(pendientes.map(s => s._id)));
+    }
+  };
+
+  useEffect(() => {
+    const raw = localStorage.getItem('usuario');
+    if (raw) {
+      try {
+        const user = JSON.parse(raw);
+        setUserId(user._id || user.id);
+        fetchAllData(user._id || user.id);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
+
+  // Filtrado de referidos
+  const referidosFiltrados = referidosDirectos.filter(ref => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    const u = ref.usuario || {};
+    return (
+      u.nombre_completo?.toLowerCase().includes(term) ||
+      u.nombre_usuario?.toLowerCase().includes(term) ||
+      u.correo_electronico?.toLowerCase().includes(term) ||
+      u.dni?.toLowerCase().includes(term)
     );
-  };
-
-  // Función para seleccionar todas las solicitudes pendientes (máximo 20)
-  const seleccionarTodasPendientes = () => {
-    const solicitudesArray = Array.isArray(solicitudesRecibidas) ? solicitudesRecibidas : [];
-    const pendientesIds = solicitudesArray
-      .filter(s => s.estado === 'pendiente')
-      .slice(0, 20)
-      .map(s => s._id);
-    setSelectedSolicitudes(pendientesIds);
-  };
-
-  // Función para limpiar selección
-  const limpiarSeleccion = () => {
-    setSelectedSolicitudes([]);
-  };
-
-  // Función para activar billetera
-  const handleActivarBilletera = async () => {
-    try {
-      const usuarioString = localStorage.getItem('usuario');
-      if (!usuarioString) {
-        setMessage({ text: 'No se encontró el usuario en localStorage.', type: 'error' });
-        return;
-      }
-
-      const usuario = JSON.parse(usuarioString);
-      const token = localStorage.getItem('token');
-      
-      await axios.post(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/activar`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      setMessage({ text: 'Billetera activada exitosamente', type: 'success' });
-      setBilleteraActiva(true);
-    } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Error al activar billetera';
-      setMessage({ text: errorMsg, type: 'error' });
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex flex-col text-white pb-20">
-      <Background />
-
-      {/* Contenedor principal */}
-      <div className="max-w-4xl mx-auto px-4 py-8 w-full">
-        {/* Encabezado con gradiente */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 rounded-t-xl">
-          <h1 className="text-3xl font-bold text-center flex items-center justify-center gap-2">
-            <FaUsers /> Referidos Directos
-          </h1>
-        </div>
-
-        {/* Contenido principal */}
-        <div className="bg-gray-800 bg-opacity-80 p-6 rounded-b-xl">
-          <Message message={message.text} type={message.type} onClose={handleCloseMessage} />
-          
-          {/* Estado de la billetera */}
-          {verificandoBilletera ? (
-            <div className="mb-6 bg-gray-700 border border-gray-600 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500"></div>
-                <span className="text-gray-300">Verificando estado de la billetera...</span>
-              </div>
-            </div>
-          ) : !billeteraActiva ? (
-            <div className="mb-6 bg-red-600 bg-opacity-20 border border-red-500 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FaExclamationTriangle className="w-5 h-5 text-red-400" />
-                  <div>
-                    <span className="text-red-300 font-medium">Billetera Inactiva</span>
-                    <p className="text-red-200 text-sm mt-1">
-                      Debes activar tu billetera para poder aceptar referidos y recibir comisiones.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleActivarBilletera}
-                  className="bg-green-600 hover:bg-green-500 text-white py-2 px-4 rounded-lg transition duration-200 flex items-center gap-2"
-                >
-                  <FaWallet />
-                  Activar Billetera
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="mb-6 bg-green-600 bg-opacity-20 border border-green-500 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <FaWallet className="w-5 h-5 text-green-400" />
-                <div>
-                  <span className="text-green-300 font-medium">Billetera Activa</span>
-                  <p className="text-green-200 text-sm mt-1">
-                    Tu billetera está activa y lista para recibir comisiones por referidos.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Tabs */}
-          <div className="flex border-b border-gray-700 mb-6">
-            <button
-              className={`py-2 px-4 font-medium flex items-center gap-2 ${activeTab === 'recibidas' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'}`}
-              onClick={() => setActiveTab('recibidas')}
-            >
-              <FaPaperPlane /> Recibidas
-            </button>
-            <button
-              className={`py-2 px-4 font-medium flex items-center gap-2 ${activeTab === 'enviadas' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'}`}
-              onClick={() => setActiveTab('enviadas')}
-            >
-              <FaPaperPlane /> Enviadas
-            </button>
-          </div>
-
-          {/* Botón para nueva solicitud */}
-          <button
-            onClick={() => setShowModal(true)}
-            className="mb-6 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition duration-200 flex items-center gap-2"
-          >
-            <FaUserPlus /> Nueva Solicitud
-          </button>
-
-          {/* Contenido de las tabs */}
-          {isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
-          ) : activeTab === 'recibidas' ? (
-            <SolicitudesRecibidas 
-              solicitudes={solicitudesRecibidas} 
-              onCambiarEstado={handleCambiarEstado}
-              setMessage={setMessage}
-              selectedSolicitudes={selectedSolicitudes}
-              onToggleSeleccion={toggleSeleccionSolicitud}
-              onSeleccionarTodas={seleccionarTodasPendientes}
-              onLimpiarSeleccion={limpiarSeleccion}
-              onAceptarPorLote={handleAceptarPorLote}
-              isProcessingBatch={isProcessingBatch}
-              billeteraActiva={billeteraActiva}
-              paginacion={paginacionRecibidas}
-              paginaActual={paginaActualRecibidas}
-              onCambiarPagina={(pagina) => handleCambiarPagina('recibidas', pagina)}
-            />
-          ) : (
-            <SolicitudesEnviadas 
-              solicitudes={solicitudesEnviadas} 
-              paginacion={paginacionEnviadas}
-              paginaActual={paginaActualEnviadas}
-              onCambiarPagina={(pagina) => handleCambiarPagina('enviadas', pagina)}
-            />
-          )}
-
-          {/* Modal para nueva solicitud */}
-          {showModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full">
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                  <FaUserPlus /> Nueva Solicitud de Referido
-                </h2>
-                <form onSubmit={handleCrearSolicitud}>
-                  <div className="mb-4">
-                    <label className="block text-gray-300 mb-2">ID del usuario a referir</label>
-                    <input
-                      type="text"
-                      value={referidoId}
-                      onChange={(e) => setReferidoId(e.target.value)}
-                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white"
-                      placeholder="Ingresa el ID del usuario"
-                      required
-                    />
-                    <p className="text-xs text-gray-400 mt-1">
-                      Ingresa el ID del usuario que deseas agregar como referido directo
-                    </p>
-                  </div>
-                  <div className="flex justify-end space-x-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowModal(false)}
-                      className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg transition duration-200"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition duration-200"
-                    >
-                      Enviar Solicitud
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      <MobileNav />
-    </div>
-  );
-};
-
-// Componente para mostrar solicitudes recibidas - VERSIÓN CORREGIDA
-const SolicitudesRecibidas = ({ 
-  solicitudes, 
-  onCambiarEstado, 
-  setMessage,
-  selectedSolicitudes,
-  onToggleSeleccion,
-  onSeleccionarTodas,
-  onLimpiarSeleccion,
-  onAceptarPorLote,
-  isProcessingBatch,
-  billeteraActiva,
-  paginacion,
-  paginaActual,
-  onCambiarPagina
-}) => {
-  // CORRECCIÓN: Asegurarse de que solicitudes sea un array y clasificarlas correctamente
-  const solicitudesArray = Array.isArray(solicitudes) ? solicitudes : [];
-  
-  // Filtrar correctamente las solicitudes por estado
-  const solicitudesPendientes = solicitudesArray.filter(s => s.estado === 'pendiente');
-  const solicitudesAceptadas = solicitudesArray.filter(s => s.estado === 'aceptado');
-  const solicitudesRechazadas = solicitudesArray.filter(s => s.estado === 'rechazado');
-
-  console.log('📊 Solicitudes clasificadas:', {
-    total: solicitudesArray.length,
-    pendientes: solicitudesPendientes.length,
-    aceptadas: solicitudesAceptadas.length,
-    rechazadas: solicitudesRechazadas.length
   });
 
-  if (solicitudesArray.length === 0) {
-    return (
-      <div className="text-center py-8 bg-gray-700 bg-opacity-50 rounded-lg">
-        <p className="text-gray-400">No tienes solicitudes recibidas.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Controles de lote para solicitudes pendientes */}
-      {solicitudesPendientes.length > 0 && (
-        <div className="bg-gray-700 p-4 rounded-lg border-l-4 border-yellow-500">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-4">
-              <div>
-                <span className="text-gray-300 block">
-                  {selectedSolicitudes.length} de {Math.min(solicitudesPendientes.length, 20)} seleccionadas
-                </span>
-                <span className="text-gray-400 text-sm">
-                  Máximo 20 solicitudes por lote
-                </span>
+    <div className="min-h-screen bg-[#06110D] text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-white pb-28">
+      <Background />
+
+      <main className="max-w-6xl mx-auto px-3.5 sm:px-6 lg:px-8 py-6 sm:py-10 flex-grow w-full">
+        {/* Banner Superior Mobile-Friendly */}
+        <div className="relative rounded-2xl sm:rounded-3xl p-5 sm:p-8 mb-6 overflow-hidden border border-emerald-500/25 bg-gradient-to-br from-[#0B251B] via-[#091F17] to-[#071711] shadow-2xl shadow-emerald-950/40">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16"></div>
+
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold mb-2.5">
+                <Users className="h-3.5 w-3.5 text-emerald-400" />
+                <span>Panel de Patrocinador</span>
               </div>
-              <div className="flex gap-2">
+              <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight font-heading leading-tight">
+                Mis Referidos y Comisiones
+              </h1>
+              <p className="text-slate-300 text-xs sm:text-base mt-2 max-w-2xl leading-relaxed">
+                Recibe <strong className="text-emerald-400 font-semibold">COP $1,400</strong> por cada socio directo vinculado a tu red una vez ambos tengan su aporte verificado.
+              </p>
+
+              {/* Botones de Acción en Cabecera */}
+              <div className="flex flex-wrap items-center gap-2.5 mt-4">
                 <button
-                  onClick={onSeleccionarTodas}
-                  className="text-blue-400 hover:text-blue-300 text-sm"
+                  onClick={() => handleCopyToClipboard(userId, 'my-id')}
+                  className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-slate-900/90 border border-emerald-500/25 hover:border-emerald-500/40 text-xs font-mono text-emerald-300 flex items-center justify-center gap-2 transition-colors active:scale-98"
                 >
-                  Seleccionar todas
+                  {isCopied['my-id'] ? <Check className="h-4 w-4 text-emerald-400" /> : <Clipboard className="h-4 w-4 text-slate-400" />}
+                  <span>Mi ID: {userId ? userId.slice(-8) : '...'}</span>
                 </button>
+
                 <button
-                  onClick={onLimpiarSeleccion}
-                  className="text-gray-400 hover:text-gray-300 text-sm"
+                  onClick={() => setShowInviteModal(true)}
+                  className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs transition-all shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5 active:scale-98"
                 >
-                  Limpiar
+                  <UserPlus className="h-4 w-4" />
+                  <span>Agregar Referido</span>
+                </button>
+
+                <button
+                  onClick={handleSweepCommissions}
+                  disabled={isSweeping}
+                  className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-[#0D261C] hover:bg-[#123627] border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors active:scale-98"
+                  title="Verificar y liquidar comisiones de socios que ya hayan aportado"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isSweeping ? 'animate-spin' : ''}`} />
+                  <span>{isSweeping ? 'Revisando...' : 'Re-evaluar'}</span>
                 </button>
               </div>
             </div>
-            <button
-              onClick={onAceptarPorLote}
-              disabled={selectedSolicitudes.length === 0 || isProcessingBatch || !billeteraActiva}
-              className="bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white py-2 px-4 rounded-lg transition duration-200 flex items-center gap-2"
-            >
-              <FaCheckDouble />
-              {isProcessingBatch ? 'Procesando...' : `Aceptar ${selectedSolicitudes.length} seleccionadas`}
-            </button>
-          </div>
-          {!billeteraActiva && (
-            <p className="text-red-400 text-sm mt-2 text-center">
-              ⚠️ Activa tu billetera para poder aceptar referidos
-            </p>
-          )}
-        </div>
-      )}
 
-      {/* Solicitudes pendientes */}
-      {solicitudesPendientes.length > 0 && (
-        <div>
-          <h3 className="text-lg font-medium mb-4 text-gray-300">
-            Solicitudes Pendientes ({solicitudesPendientes.length})
-          </h3>
-          <div className="space-y-4">
-            {solicitudesPendientes.map((solicitud) => (
-              <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-yellow-500">
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                  <div className="flex items-start gap-3 flex-1">
-                    <input
-                      type="checkbox"
-                      checked={selectedSolicitudes.includes(solicitud._id)}
-                      onChange={() => onToggleSeleccion(solicitud._id)}
-                      className="mt-1 text-blue-500 rounded focus:ring-blue-400"
-                      disabled={selectedSolicitudes.length >= 20 && !selectedSolicitudes.includes(solicitud._id) || !billeteraActiva}
-                    />
-                    <div className="flex-1">
-                      <h3 className="font-medium text-lg">
-                        {solicitud.solicitante_id?.nombre_completo || solicitud.solicitante_id?.nombre_usuario || 'Usuario solicitante'}
-                      </h3>
-                      <p className="text-gray-400 text-sm">
-                        @{solicitud.solicitante_id?.nombre_usuario || 'ID: ' + (solicitud.solicitante_id?._id || solicitud.solicitante_id)}
-                      </p>
-                      <div className="mt-2 flex items-center">
-                        <span className="text-gray-300 mr-2">Estado:</span>
-                        <span className="px-2 py-1 rounded-full text-xs bg-yellow-500 text-white">
-                          Pendiente
-                        </span>
+            {/* Badge de Estado del Patrocinador */}
+            <div className="glass-card bg-[#06140F]/80 border border-emerald-500/30 p-3.5 sm:p-5 rounded-2xl shrink-0 shadow-lg min-w-[190px]">
+              <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold text-slate-400 block mb-1">
+                Tu Estado de Aporte (Patrocinador)
+              </span>
+              <div className="flex items-center gap-2">
+                {resumenComisiones.patrocinador_verificado ? (
+                  <>
+                    <ShieldCheck className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
+                    <span className="font-extrabold text-emerald-300 text-xs sm:text-sm">Aporte Verificado</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" />
+                    <span className="font-extrabold text-amber-300 text-xs sm:text-sm">Sin Aporte Aprobado</span>
+                  </>
+                )}
+              </div>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1">
+                {resumenComisiones.patrocinador_verificado 
+                  ? 'Habilitado para recibir comisiones' 
+                  : 'Realiza tu aporte para cobrar comisiones'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Toast */}
+        {message && (
+          <div className={`mb-5 p-3.5 rounded-2xl text-center font-bold text-xs sm:text-sm border shadow-2xl flex items-center justify-center gap-2 animate-fade-in ${
+            message.type === 'success' 
+              ? 'bg-[#0E241C] border-emerald-500 text-emerald-300 shadow-emerald-950/50' 
+              : message.type === 'warning'
+                ? 'bg-[#241B0B] border-amber-500 text-amber-300'
+                : 'bg-[#2A0E12] border-rose-500 text-rose-300'
+          }`}>
+            {message.type === 'success' ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertCircle className="h-4 w-4 shrink-0" />}
+            <span>{message.text}</span>
+          </div>
+        )}
+
+        {/* 3 KPIs de Comisiones */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-5 mb-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={`skel-ref-kpi-${i}`} className="glass-card p-4 sm:p-6 rounded-2xl border border-emerald-500/10 bg-[#0A1812]/70 animate-pulse space-y-2.5">
+                <div className="h-3 w-32 bg-emerald-500/20 rounded"></div>
+                <div className="h-7 w-40 bg-slate-700 rounded-lg"></div>
+                <div className="h-3 w-28 bg-slate-800 rounded"></div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-5 mb-6">
+            {/* 1. Comisiones Pagadas */}
+            <div className="glass-card p-4 sm:p-6 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 group">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400">Comisiones Pagadas</span>
+                <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-500/15 text-emerald-400 group-hover:scale-110 transition-transform">
+                  <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
+                </div>
+              </div>
+              <p className="text-xl sm:text-3xl font-extrabold text-white font-mono tracking-tight">
+                COP ${resumenComisiones.comisiones_pagadas_total.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <p className="text-[11px] text-emerald-400 mt-1">
+                Abonadas a tu billetera digital
+              </p>
+            </div>
+
+            {/* 2. Comisiones Pendientes */}
+            <div className="glass-card p-4 sm:p-6 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 group">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400">Comisiones Pendientes</span>
+                <div className="p-2 sm:p-2.5 rounded-xl bg-amber-500/15 text-amber-400 group-hover:scale-110 transition-transform">
+                  <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
+                </div>
+              </div>
+              <p className="text-xl sm:text-3xl font-extrabold text-amber-300 font-mono tracking-tight">
+                COP ${resumenComisiones.comisiones_pendientes_total.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Se liquidan al verificar los 2 aportes
+              </p>
+            </div>
+
+            {/* 3. Total de Referidos */}
+            <div className="glass-card p-4 sm:p-6 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 group">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400">Tus Referidos</span>
+                <div className="p-2 sm:p-2.5 rounded-xl bg-teal-500/15 text-teal-400 group-hover:scale-110 transition-transform">
+                  <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+                </div>
+              </div>
+              <p className="text-xl sm:text-3xl font-extrabold text-white font-heading tracking-tight">
+                {resumenComisiones.total_referidos} <span className="text-xs sm:text-sm font-normal text-slate-400">socios directos</span>
+              </p>
+              <p className="text-[11px] text-teal-300 mt-1">
+                {resumenComisiones.referidos_verificados} con aporte verificado
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Pestañas de Navegación Mobile-Scrollable */}
+        <div className="flex overflow-x-auto no-scrollbar border-b border-emerald-500/20 mb-5 gap-1 sm:gap-2 pb-1">
+          <button
+            onClick={() => setActiveTab('directos')}
+            className={`py-2.5 px-3.5 sm:px-5 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'directos'
+                ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10 rounded-t-xl'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            <Users className="h-4 w-4" />
+            <span>Mis Referidos ({referidosDirectos.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('recibidas')}
+            className={`py-2.5 px-3.5 sm:px-5 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'recibidas'
+                ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10 rounded-t-xl'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            <UserPlus className="h-4 w-4" />
+            <span>
+              Pendientes ({solicitudesRecibidas.filter(s => s.estado === 'pendiente').length})
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('enviadas')}
+            className={`py-2.5 px-3.5 sm:px-5 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'enviadas'
+                ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10 rounded-t-xl'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            <ArrowRight className="h-4 w-4" />
+            <span>Mi Patrocinador ({solicitudesEnviadas.length})</span>
+          </button>
+        </div>
+
+        {/* TAB 1: MIS REFERIDOS DIRECTOS */}
+        {activeTab === 'directos' && (
+          <div className="space-y-3.5">
+            <div className="p-3 rounded-2xl bg-[#091C14] border border-emerald-500/20 text-xs text-slate-300 flex items-start sm:items-center gap-2.5 leading-relaxed">
+              <Sparkles className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+              <span>
+                <strong>Tus Referidos Directos:</strong> Socios vinculados bajo tu patrocinio. <strong className="text-emerald-400">Tú recibes COP $1,400</strong> por cada uno abonado a tu saldo cuando ambos estén verificados con aporte.
+              </span>
+            </div>
+
+            {/* Buscador de Referidos */}
+            <div className="glass-card p-3 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 shadow-md">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre, @usuario, correo o DNI..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-900/90 border border-emerald-500/20 rounded-xl text-white placeholder-slate-500 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                />
+              </div>
+            </div>
+
+            {isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={`skel-dir-${i}`} className="p-4 rounded-2xl bg-[#0A1812]/70 border border-emerald-500/10 animate-pulse flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20"></div>
+                      <div className="space-y-2">
+                        <div className="h-3.5 w-36 bg-emerald-500/20 rounded"></div>
+                        <div className="h-3 w-28 bg-slate-800 rounded"></div>
                       </div>
-                      <p className="text-gray-400 text-sm mt-1">
-                        {new Date(solicitud.fecha || solicitud.createdAt).toLocaleDateString('es-ES', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </p>
+                    </div>
+                    <div className="h-7 w-28 bg-slate-800 rounded-xl"></div>
+                  </div>
+                ))}
+              </div>
+            ) : referidosFiltrados.length === 0 ? (
+              <div className="text-center py-12 sm:py-16 glass-card rounded-3xl border border-emerald-500/20 bg-[#0A1812]/80 p-6 sm:p-8">
+                <Users className="h-10 w-10 sm:h-12 sm:w-12 text-emerald-500/30 mx-auto mb-3" />
+                <h3 className="text-base sm:text-lg font-bold text-white font-heading">No tienes referidos directos aún</h3>
+                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                  {searchTerm 
+                    ? `No se encontraron resultados para "${searchTerm}".` 
+                    : 'Comparte tu ID o códigos de invitación para vincular nuevos socios a tu red y cobrar comisiones directas.'}
+                </p>
+              </div>
+            ) : (
+              referidosFiltrados.map((ref) => {
+                const usuario = ref.usuario || {};
+                const cleanPhone = (usuario.linea_whatsapp || usuario.linea_llamadas || '').replace(/[^0-9]/g, '');
+                const isComisionPagada = ref.comision_pagada;
+                const isReferidoVerificado = ref.referido_verificado;
+
+                return (
+                  <div
+                    key={ref._id}
+                    className="glass-card p-4 sm:p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/85 hover:border-emerald-500/40 transition-all shadow-md"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+                      {/* Información del Usuario */}
+                      <div className="flex items-start sm:items-center gap-3 min-w-0">
+                        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center font-extrabold text-white text-sm sm:text-base shrink-0">
+                          {usuario.nombre_completo ? usuario.nombre_completo.charAt(0).toUpperCase() : 'U'}
+                        </div>
+
+                        <div className="truncate flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                            <h3 className="font-bold text-white text-xs sm:text-base truncate font-heading">
+                              {usuario.nombre_completo || 'Socio Directo'}
+                            </h3>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              @{usuario.nombre_usuario || 'usuario'}
+                            </span>
+                            <span className={`text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              isReferidoVerificado
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                            }`}>
+                              {isReferidoVerificado ? '✓ Aporte Verificado' : '⏳ Aporte Pendiente'}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs text-slate-400">
+                            {usuario.dni && <span>DNI: <strong className="text-slate-300 font-normal">{usuario.dni}</strong></span>}
+                            {usuario.correo_electronico && (
+                              <span className="flex items-center gap-1 text-slate-400 truncate">
+                                <Mail className="h-3 w-3" />
+                                <span>{usuario.correo_electronico}</span>
+                              </span>
+                            )}
+                            {cleanPhone && (
+                              <a
+                                href={`https://wa.me/${cleanPhone}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-emerald-400 hover:underline font-semibold"
+                              >
+                                <MessageCircle className="h-3 w-3" />
+                                <span>WhatsApp</span>
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Estado de la Comisión */}
+                      <div className="flex flex-col sm:items-end shrink-0 border-t sm:border-t-0 pt-2.5 sm:pt-0 border-emerald-500/10">
+                        {isComisionPagada ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] sm:text-xs font-bold shadow-sm self-start sm:self-auto">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            <span>Comisión Pagada: COP $1,400</span>
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] sm:text-xs font-bold shadow-sm self-start sm:self-auto">
+                            <Clock className="h-3.5 w-3.5" />
+                            <span>Comisión Pendiente: COP $1,400</span>
+                          </div>
+                        )}
+                        <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 max-w-xs sm:text-right leading-tight">
+                          {ref.motivo_pendiente || (isComisionPagada ? 'Abonada a tu billetera' : 'Se liquidará automáticamente cuando ambos aportes estén validados')}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <div className="w-full sm:w-auto flex gap-2">
-                    <button
-                      onClick={async () => {
-                        if (!billeteraActiva) {
-                          setMessage({ 
-                            text: 'Debes activar tu billetera primero para poder aceptar referidos.', 
-                            type: 'error' 
-                          });
-                          return;
-                        }
-                        await onCambiarEstado(solicitud._id, 'aceptado');
-                      }}
-                      disabled={!billeteraActiva}
-                      className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg transition-all duration-200 flex items-center justify-center gap-2 font-medium text-sm sm:text-base"
-                    >
-                      <FaCheck className="text-lg" />
-                      <span className="whitespace-nowrap">Aceptar</span>
-                    </button>
-                    <button
-                      onClick={() => onCambiarEstado(solicitud._id, 'rechazado')}
-                      className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 font-medium text-sm sm:text-base"
-                    >
-                      <FaTimes className="text-lg" />
-                      <span className="whitespace-nowrap">Rechazar</span>
-                    </button>
-                  </div>
-                </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* TAB 2: SOLICITUDES RECIBIDAS / PENDIENTES */}
+        {activeTab === 'recibidas' && (
+          <div className="space-y-3.5">
+            <div className="p-3 rounded-2xl bg-[#091C14] border border-emerald-500/20 text-xs text-slate-300 flex items-start sm:items-center gap-2.5 leading-relaxed">
+              <UserPlus className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+              <span>
+                <strong>Solicitudes Pendientes:</strong> Socios que están a la espera de confirmación de patrocinio. Al aceptarlos y tener ambos aporte activo, <strong className="text-emerald-400">tú ganarás COP $1,400 por cada uno</strong>.
+              </span>
+            </div>
+
+            {/* Barra de Aprobación Masiva */}
+            {solicitudesRecibidas.filter(s => s.estado === 'pendiente').length > 0 && (
+              <div className="p-3 rounded-2xl bg-[#0A1812]/80 border border-emerald-500/15 mb-3 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+                <button
+                  onClick={toggleSelectAllRecibidas}
+                  className="flex items-center gap-2 text-emerald-400 hover:text-emerald-300 font-bold transition-colors"
+                >
+                  {selectedSolicitudes.size === solicitudesRecibidas.filter(s => s.estado === 'pendiente').length ? (
+                    <CheckSquare className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                  <span>Seleccionar pendientes</span>
+                </button>
+
+                {selectedSolicitudes.size > 0 && (
+                  <button
+                    onClick={handleAceptarPorLote}
+                    disabled={isProcessing}
+                    className="py-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center gap-1.5 active:scale-98"
+                  >
+                    {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                    <span>Aceptar ({selectedSolicitudes.size})</span>
+                  </button>
+                )}
               </div>
-            ))}
+            )}
+
+            {solicitudesRecibidas.length === 0 ? (
+              <div className="text-center py-12 sm:py-16 glass-card rounded-3xl border border-emerald-500/20 bg-[#0A1812]/80 p-6 sm:p-8">
+                <CheckCircle2 className="h-10 w-10 sm:h-12 sm:w-12 text-emerald-500/30 mx-auto mb-3" />
+                <h3 className="text-base sm:text-lg font-bold text-white font-heading">No tienes solicitudes pendientes</h3>
+                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                  Aquí aparecerán los socios referidos pendientes de confirmación.
+                </p>
+              </div>
+            ) : (
+              solicitudesRecibidas.map((sol) => {
+                const referido = sol.referido_id || {};
+                const isPendiente = sol.estado === 'pendiente';
+                const isAceptado = sol.estado === 'aceptado';
+                const cleanPhone = (referido.linea_whatsapp || referido.linea_llamadas || '').replace(/[^0-9]/g, '');
+
+                return (
+                  <div
+                    key={sol._id}
+                    className="glass-card p-4 sm:p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/85 shadow-md"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+                      <div className="flex items-start sm:items-center gap-3 min-w-0">
+                        {isPendiente && (
+                          <button
+                            onClick={() => toggleSelectSolicitud(sol._id)}
+                            className="mt-0.5 sm:mt-0 p-1 text-emerald-400 hover:text-emerald-300"
+                          >
+                            {selectedSolicitudes.has(sol._id) ? <CheckSquare className="h-5 w-5" /> : <Square className="h-5 w-5 text-slate-500" />}
+                          </button>
+                        )}
+
+                        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center font-extrabold text-white text-sm sm:text-base shrink-0">
+                          {referido.nombre_completo ? referido.nombre_completo.charAt(0).toUpperCase() : 'U'}
+                        </div>
+
+                        <div className="truncate flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                            <span className="text-[10px] font-semibold text-slate-400">Referido:</span>
+                            <h3 className="font-bold text-white text-xs sm:text-base truncate font-heading">
+                              {referido.nombre_completo || 'Usuario'}
+                            </h3>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              @{referido.nombre_usuario || 'usuario'}
+                            </span>
+                            <span className={`text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              isAceptado 
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+                                : isPendiente 
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                                  : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                            }`}>
+                              {sol.estado.toUpperCase()}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs text-slate-400">
+                            {referido.dni && <span>DNI: <strong className="text-slate-300 font-normal">{referido.dni}</strong></span>}
+                            {referido.correo_electronico && <span>{referido.correo_electronico}</span>}
+                            {cleanPhone && (
+                              <a href={`https://wa.me/${cleanPhone}`} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-semibold">
+                                WhatsApp
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Acciones */}
+                      {isPendiente && (
+                        <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-500/10">
+                          <button
+                            onClick={() => handleCambiarEstado(sol._id, 'aceptado')}
+                            className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs transition-all shadow-md flex items-center justify-center gap-1.5 active:scale-98"
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span>Aceptar</span>
+                          </button>
+                          <button
+                            onClick={() => handleCambiarEstado(sol._id, 'rechazado')}
+                            className="px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-xs font-semibold transition-colors active:scale-98"
+                          >
+                            Rechazar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: SOLICITUDES ENVIADAS / MI PATROCINADOR */}
+        {activeTab === 'enviadas' && (
+          <div className="space-y-3.5">
+            <div className="p-3 rounded-2xl bg-[#091C14] border border-emerald-500/20 text-xs text-slate-300 flex items-start sm:items-center gap-2.5 leading-relaxed">
+              <ArrowRight className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+              <span>
+                <strong>Tu Patrocinador:</strong> El socio al cual te vinculaste como referido.
+              </span>
+            </div>
+
+            {solicitudesEnviadas.length === 0 ? (
+              <div className="text-center py-12 sm:py-16 glass-card rounded-3xl border border-emerald-500/20 bg-[#0A1812]/80 p-6 sm:p-8">
+                <ArrowRight className="h-10 w-10 sm:h-12 sm:w-12 text-emerald-500/30 mx-auto mb-3" />
+                <h3 className="text-base sm:text-lg font-bold text-white font-heading">No tienes patrocinador asignado</h3>
+                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                  Tu cuenta es patrocinador directo de tu propia red.
+                </p>
+              </div>
+            ) : (
+              solicitudesEnviadas.map((sol) => {
+                const patrocinador = sol.solicitante_id || {};
+                const isAceptado = sol.estado === 'aceptado';
+                const isPendiente = sol.estado === 'pendiente';
+
+                return (
+                  <div
+                    key={sol._id}
+                    className="glass-card p-4 sm:p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/85 shadow-md"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center font-extrabold text-white text-sm sm:text-base shrink-0">
+                          {patrocinador.nombre_completo ? patrocinador.nombre_completo.charAt(0).toUpperCase() : 'P'}
+                        </div>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] font-semibold text-slate-400">Patrocinador:</span>
+                            <h3 className="font-bold text-white text-xs sm:text-base font-heading">
+                              {patrocinador.nombre_completo || 'Patrocinador'}
+                            </h3>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              @{patrocinador.nombre_usuario || 'usuario'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] sm:text-xs text-slate-400 mt-1">
+                            {isPendiente 
+                              ? `Pendiente de confirmación con @${patrocinador.nombre_usuario || 'tu patrocinador'}.` 
+                              : `¡@${patrocinador.nombre_usuario || 'patrocinador'} es tu patrocinador activo!`}
+                          </p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            Fecha: {new Date(sol.fecha).toLocaleDateString('es-ES')}
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className={`text-xs font-bold px-3 py-1.5 rounded-xl border self-start sm:self-auto ${
+                        isAceptado 
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+                          : isPendiente 
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                            : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                      }`}>
+                        {sol.estado.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* Modal Agregar Referido */}
+      {showInviteModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#0A1812] border border-emerald-500/30 rounded-3xl max-w-md w-full shadow-2xl p-6 sm:p-7">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2.5">
+                <UserPlus className="h-5 w-5 text-emerald-400" />
+                <h3 className="text-lg font-bold text-white font-heading">Agregar Nuevo Referido</h3>
+              </div>
+              <button 
+                onClick={() => setShowInviteModal(false)}
+                className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400 mb-4">
+              Ingresa el ID del nuevo socio para agregarlo bajo tu patrocinio directo en Granja Raíz de Vida.
+            </p>
+
+            <form onSubmit={handleCrearSolicitud} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">ID del Referido (Nuevo Socio)</label>
+                <input
+                  type="text"
+                  placeholder="ID de MongoDB del socio a referir..."
+                  value={referidoIdInput}
+                  onChange={(e) => setReferidoIdInput(e.target.value)}
+                  className="w-full p-3 bg-slate-900 border border-emerald-500/20 rounded-xl text-white text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowInviteModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs transition-all shadow-md shadow-emerald-500/20"
+                >
+                  Vincular Referido
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* Solicitudes aceptadas */}
-      {solicitudesAceptadas.length > 0 && (
-        <div>
-          <h3 className="text-lg font-medium mb-4 text-gray-300">
-            Solicitudes Aceptadas ({solicitudesAceptadas.length})
-          </h3>
-          <div className="space-y-4">
-            {solicitudesAceptadas.map((solicitud) => (
-              <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-green-500">
-                <div>
-                  <h3 className="font-medium text-lg text-green-300">
-                    {solicitud.solicitante_id?.nombre_completo || solicitud.solicitante_id?.nombre_usuario || 'Usuario solicitante'}
-                  </h3>
-                  <p className="text-gray-400 text-sm">
-                    @{solicitud.solicitante_id?.nombre_usuario || 'ID: ' + (solicitud.solicitante_id?._id || solicitud.solicitante_id)}
-                  </p>
-                  <div className="mt-2 flex items-center">
-                    <span className="text-gray-300 mr-2">Estado:</span>
-                    <span className="px-2 py-1 rounded-full text-xs bg-green-500 text-white">
-                      Aceptado
-                    </span>
-                  </div>
-                  <p className="text-gray-400 text-sm mt-1">
-                    Aceptado el: {solicitud.fecha_respuesta ? 
-                      new Date(solicitud.fecha_respuesta).toLocaleDateString('es-ES', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) : 
-                      new Date(solicitud.updatedAt).toLocaleDateString('es-ES', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
-                    }
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Solicitudes rechazadas */}
-      {solicitudesRechazadas.length > 0 && (
-        <div>
-          <h3 className="text-lg font-medium mb-4 text-gray-300">
-            Solicitudes Rechazadas ({solicitudesRechazadas.length})
-          </h3>
-          <div className="space-y-4">
-            {solicitudesRechazadas.map((solicitud) => (
-              <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-red-500">
-                <div>
-                  <h3 className="font-medium text-lg text-red-300">
-                    {solicitud.solicitante_id?.nombre_completo || solicitud.solicitante_id?.nombre_usuario || 'Usuario solicitante'}
-                  </h3>
-                  <p className="text-gray-400 text-sm">
-                    @{solicitud.solicitante_id?.nombre_usuario || 'ID: ' + (solicitud.solicitante_id?._id || solicitud.solicitante_id)}
-                  </p>
-                  <div className="mt-2 flex items-center">
-                    <span className="text-gray-300 mr-2">Estado:</span>
-                    <span className="px-2 py-1 rounded-full text-xs bg-red-500 text-white">
-                      Rechazado
-                    </span>
-                  </div>
-                  <p className="text-gray-400 text-sm mt-1">
-                    Rechazado el: {solicitud.fecha_respuesta ? 
-                      new Date(solicitud.fecha_respuesta).toLocaleDateString('es-ES', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) : 
-                      new Date(solicitud.updatedAt).toLocaleDateString('es-ES', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
-                    }
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Paginación */}
-      {paginacion.totalPaginas > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-6">
-          <button
-            onClick={() => onCambiarPagina(paginaActual - 1)}
-            disabled={paginaActual === 1}
-            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed rounded"
-          >
-            Anterior
-          </button>
-          <span className="text-gray-300">
-            Página {paginaActual} de {paginacion.totalPaginas}
-          </span>
-          <button
-            onClick={() => onCambiarPagina(paginaActual + 1)}
-            disabled={paginaActual === paginacion.totalPaginas}
-            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed rounded"
-          >
-            Siguiente
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Componente para mostrar solicitudes enviadas - VERSIÓN CORREGIDA
-const SolicitudesEnviadas = ({ solicitudes, paginacion, paginaActual, onCambiarPagina }) => {
-  // CORRECCIÓN: Asegurarse de que solicitudes sea un array
-  const solicitudesArray = Array.isArray(solicitudes) ? solicitudes : [];
-
-  // Clasificar las solicitudes enviadas por estado
-  const solicitudesPendientes = solicitudesArray.filter(s => s.estado === 'pendiente');
-  const solicitudesAceptadas = solicitudesArray.filter(s => s.estado === 'aceptado');
-  const solicitudesRechazadas = solicitudesArray.filter(s => s.estado === 'rechazado');
-
-  if (solicitudesArray.length === 0) {
-    return (
-      <div className="text-center py-8 bg-gray-700 bg-opacity-50 rounded-lg">
-        <p className="text-gray-400">No has enviado solicitudes de referido.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Solicitudes pendientes enviadas */}
-      {solicitudesPendientes.length > 0 && (
-        <div>
-          <h3 className="text-lg font-medium mb-4 text-gray-300">
-            Solicitudes Pendientes ({solicitudesPendientes.length})
-          </h3>
-          <div className="space-y-4">
-            {solicitudesPendientes.map((solicitud) => (
-              <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-yellow-500">
-                <div>
-                  <h3 className="font-medium">
-                    {solicitud.referido_id?.nombre_completo || solicitud.referido_id?.nombre_usuario || 'Usuario referido'}
-                  </h3>
-                  <p className="text-gray-400 text-sm">
-                    @{solicitud.referido_id?.nombre_usuario || 'ID: ' + (solicitud.referido_id?._id || solicitud.referido_id)}
-                  </p>
-                  <div className="mt-2 flex items-center">
-                    <span className="text-gray-300 mr-2">Estado:</span>
-                    <span className="px-2 py-1 rounded-full text-xs bg-yellow-500 text-white">
-                      Pendiente
-                    </span>
-                  </div>
-                  <p className="text-gray-400 text-sm mt-1">
-                    Enviado el: {new Date(solicitud.fecha || solicitud.createdAt).toLocaleDateString('es-ES', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Solicitudes aceptadas enviadas */}
-      {solicitudesAceptadas.length > 0 && (
-        <div>
-          <h3 className="text-lg font-medium mb-4 text-gray-300">
-            Solicitudes Aceptadas ({solicitudesAceptadas.length})
-          </h3>
-          <div className="space-y-4">
-            {solicitudesAceptadas.map((solicitud) => (
-              <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-green-500">
-                <div>
-                  <h3 className="font-medium text-green-300">
-                    {solicitud.referido_id?.nombre_completo || solicitud.referido_id?.nombre_usuario || 'Usuario referido'}
-                  </h3>
-                  <p className="text-gray-400 text-sm">
-                    @{solicitud.referido_id?.nombre_usuario || 'ID: ' + (solicitud.referido_id?._id || solicitud.referido_id)}
-                  </p>
-                  <div className="mt-2 flex items-center">
-                    <span className="text-gray-300 mr-2">Estado:</span>
-                    <span className="px-2 py-1 rounded-full text-xs bg-green-500 text-white">
-                      Aceptado
-                    </span>
-                  </div>
-                  <p className="text-gray-400 text-sm mt-1">
-                    Aceptado el: {solicitud.fecha_respuesta ? 
-                      new Date(solicitud.fecha_respuesta).toLocaleDateString('es-ES', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) : 
-                      new Date(solicitud.updatedAt).toLocaleDateString('es-ES', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
-                    }
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Solicitudes rechazadas enviadas */}
-      {solicitudesRechazadas.length > 0 && (
-        <div>
-          <h3 className="text-lg font-medium mb-4 text-gray-300">
-            Solicitudes Rechazadas ({solicitudesRechazadas.length})
-          </h3>
-          <div className="space-y-4">
-            {solicitudesRechazadas.map((solicitud) => (
-              <div key={solicitud._id} className="bg-gray-700 p-4 rounded-lg border-l-4 border-red-500">
-                <div>
-                  <h3 className="font-medium text-red-300">
-                    {solicitud.referido_id?.nombre_completo || solicitud.referido_id?.nombre_usuario || 'Usuario referido'}
-                  </h3>
-                  <p className="text-gray-400 text-sm">
-                    @{solicitud.referido_id?.nombre_usuario || 'ID: ' + (solicitud.referido_id?._id || solicitud.referido_id)}
-                  </p>
-                  <div className="mt-2 flex items-center">
-                    <span className="text-gray-300 mr-2">Estado:</span>
-                    <span className="px-2 py-1 rounded-full text-xs bg-red-500 text-white">
-                      Rechazado
-                    </span>
-                  </div>
-                  <p className="text-gray-400 text-sm mt-1">
-                    Rechazado el: {solicitud.fecha_respuesta ? 
-                      new Date(solicitud.fecha_respuesta).toLocaleDateString('es-ES', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) : 
-                      new Date(solicitud.updatedAt).toLocaleDateString('es-ES', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
-                    }
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Paginación para solicitudes enviadas */}
-      {paginacion.totalPaginas > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-6">
-          <button
-            onClick={() => onCambiarPagina(paginaActual - 1)}
-            disabled={paginaActual === 1}
-            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed rounded"
-          >
-            Anterior
-          </button>
-          <span className="text-gray-300">
-            Página {paginaActual} de {paginacion.totalPaginas}
-          </span>
-          <button
-            onClick={() => onCambiarPagina(paginaActual + 1)}
-            disabled={paginaActual === paginacion.totalPaginas}
-            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed rounded"
-          >
-            Siguiente
-          </button>
-        </div>
-      )}
+      <MobileNav />
     </div>
   );
 };

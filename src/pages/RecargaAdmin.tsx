@@ -1,48 +1,67 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Background } from '../components/Background';
 import { AdminNav } from '../components/AdminNav';
-import { PlusCircle, Trash2, Eye, UserCircle2, Search } from 'lucide-react';
+import { 
+  Wallet, 
+  PlusCircle, 
+  Search, 
+  User, 
+  CheckCircle2, 
+  AlertCircle, 
+  Loader2, 
+  Calendar, 
+  ArrowUpRight,
+  TrendingUp,
+  CreditCard
+} from 'lucide-react';
 
 const LIMITE = 10;
 
 export const RecargarBilletera = () => {
-  // Estado para el formulario de recarga
   const [monto, setMonto] = useState('');
   const [usuarioId, setUsuarioId] = useState('');
-  const [usuarioInfo, setUsuarioInfo] = useState(null);
+  const [usuarioInfo, setUsuarioInfo] = useState<any>(null);
   const [loadingUsuario, setLoadingUsuario] = useState(false);
 
-  // Estado para la lista y filtro de transacciones
-  const [transacciones, setTransacciones] = useState([]);
+  const [transacciones, setTransacciones] = useState<any[]>([]);
   const [filtroUsuarioId, setFiltroUsuarioId] = useState('');
   const [loadingTransacciones, setLoadingTransacciones] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalTransacciones, setTotalTransacciones] = useState(0);
+  const [saving, setSaving] = useState(false);
 
-  // Estado para UI general
-  const [mensaje, setMensaje] = useState('');
-  const [mensajeColor, setMensajeColor] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
-  const [transaccionSeleccionada, setTransaccionSeleccionada] = useState(null);
+  const [mensaje, setMensaje] = useState<{ text: string; type: 'success' | 'error' | null } | null>(null);
 
-  const listRef = useRef<HTMLDivElement>(null);
+  const getHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    };
+  };
 
-  // Buscar usuario por ID (para el formulario de recarga)
+  const getApiUrl = () => {
+    return import.meta.env.VITE_URL_LOCAL || import.meta.env.VITE_API_URL || 'http://localhost:5005';
+  };
+
+  // Buscar usuario por ID
   useEffect(() => {
-    if (!usuarioId) {
+    if (!usuarioId.trim()) {
       setUsuarioInfo(null);
       return;
     }
     setLoadingUsuario(true);
-    fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/${usuarioId}`)
+    const apiUrl = getApiUrl();
+    fetch(`${apiUrl}/usuarios/${usuarioId.trim()}`, { headers: getHeaders() })
       .then(res => res.ok ? res.json() : null)
       .then(data => setUsuarioInfo(data))
       .catch(() => setUsuarioInfo(null))
       .finally(() => setLoadingUsuario(false));
   }, [usuarioId]);
 
-  // Obtener transacciones de recarga con paginación y filtro
+  // Obtener transacciones de recarga
   const fetchTransacciones = useCallback(async (page = 0, isInitialLoad = false) => {
     if (isInitialLoad) {
       setLoadingTransacciones(true);
@@ -52,361 +71,260 @@ export const RecargarBilletera = () => {
 
     try {
       const skip = page * LIMITE;
-      
-      // Construir URL según si hay filtro o no
-      let url;
-      if (filtroUsuarioId) {
-        url = `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/recargas/${filtroUsuarioId}?limit=${LIMITE}&skip=${skip}`;
-      } else {
-        url = `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/recargas?limit=${LIMITE}&skip=${skip}`;
-      }
-      
-      console.log(`📥 Cargando recargas - Página ${page}, Skip: ${skip}, URL:`, url);
-      
-      const response = await fetch(url);
+      const apiUrl = getApiUrl();
+      const url = filtroUsuarioId.trim()
+        ? `${apiUrl}/api/transacciones/recargas/${filtroUsuarioId.trim()}?limit=${LIMITE}&skip=${skip}`
+        : `${apiUrl}/api/transacciones/recargas?limit=${LIMITE}&skip=${skip}`;
+
+      const response = await fetch(url, { headers: getHeaders() });
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Respuesta del backend:', data);
-        
-        // Manejar tanto el formato antiguo como el nuevo
-        const recargasData = data.recargas || data;
-        const recargasArray = Array.isArray(recargasData) ? recargasData : [];
-        
+        const recargasArray = data.recargas || (Array.isArray(data) ? data : []);
+
         if (isInitialLoad) {
           setTransacciones(recargasArray);
         } else {
           setTransacciones(prev => [...prev, ...recargasArray]);
         }
-        
+
         setHasMore(data.paginacion?.hasMore || (recargasArray.length === LIMITE));
         setCurrentPage(page);
         setTotalTransacciones(data.paginacion?.totalRecargas || recargasArray.length);
-        
-        console.log(`✅ Recargas cargadas: ${recargasArray.length}, HasMore: ${data.paginacion?.hasMore || (recargasArray.length === LIMITE)}`);
-      } else {
-        throw new Error('Error en la respuesta del servidor');
       }
     } catch (error) {
-      console.error('❌ Error cargando recargas:', error);
-      setMensaje('Error al obtener transacciones.');
-      setMensajeColor('text-red-400');
-      if (isInitialLoad) {
-        setTransacciones([]);
-        setHasMore(false);
-      }
+      console.error('Error cargando recargas:', error);
     } finally {
       setLoadingTransacciones(false);
       setLoadingMore(false);
     }
   }, [filtroUsuarioId]);
 
-  // Cargar transacciones al montar y cuando cambia el filtro
   useEffect(() => {
     setCurrentPage(0);
     fetchTransacciones(0, true);
   }, [filtroUsuarioId]);
 
-  // Scroll infinito
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!listRef.current || loadingMore || loadingTransacciones || !hasMore) return;
-      const { scrollTop, scrollHeight, clientHeight } = listRef.current;
-      if (scrollHeight - scrollTop <= clientHeight + 100) {
-        fetchTransacciones(currentPage + 1, false);
-      }
-    };
-    
-    const refCurrent = listRef.current;
-    if (refCurrent) {
-      refCurrent.addEventListener('scroll', handleScroll);
-    }
-    return () => {
-      if (refCurrent) {
-        refCurrent.removeEventListener('scroll', handleScroll);
-      }
-    };
-  }, [fetchTransacciones, currentPage, loadingMore, loadingTransacciones, hasMore]);
-
-  // Función para cargar más manualmente
-  const loadMoreTransacciones = () => {
-    if (!loadingMore && hasMore) {
-      fetchTransacciones(currentPage + 1, false);
-    }
-  };
-
-  // Validación y recarga
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMensaje('');
-    setMensajeColor('');
+    setMensaje(null);
     if (!usuarioInfo) {
-      setMensaje('Usuario no encontrado para la recarga.');
-      setMensajeColor('text-red-400');
+      setMensaje({ text: 'Por favor, busca un usuario válido primero.', type: 'error' });
       return;
     }
     const montoNum = parseFloat(monto);
     if (isNaN(montoNum) || montoNum <= 0) {
-      setMensaje('Por favor, ingresa un monto válido.');
-      setMensajeColor('text-red-400');
+      setMensaje({ text: 'Por favor, ingresa un monto válido mayor que 0.', type: 'error' });
       return;
     }
+
+    setSaving(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/recargar`, {
+      const apiUrl = getApiUrl();
+      const response = await fetch(`${apiUrl}/api/billetera/recargar`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ monto: montoNum, usuarioId }),
+        headers: getHeaders(),
+        body: JSON.stringify({
+          usuarioId: usuarioId.trim(),
+          usuario_id: usuarioId.trim(),
+          monto: montoNum,
+          descripcion: `Recarga individual administrativa manual a ${usuarioInfo.nombre_usuario || usuarioInfo.nombre_completo}`
+        }),
       });
+
       if (response.ok) {
-        setMensaje('Billetera recargada exitosamente.');
-        setMensajeColor('text-green-400');
+        setMensaje({ 
+          text: `✅ Recarga de COP $${montoNum.toLocaleString('es-CO')} aplicada exitosamente a @${usuarioInfo.nombre_usuario}`, 
+          type: 'success' 
+        });
         setMonto('');
-        // Refrescar la lista de transacciones después de una recarga exitosa
-        setCurrentPage(0);
+        setUsuarioId('');
+        setUsuarioInfo(null);
         fetchTransacciones(0, true);
       } else {
-        const errorData = await response.json();
-        setMensaje(`Error: ${errorData.message || 'No se pudo recargar la billetera.'}`);
-        setMensajeColor('text-red-400');
+        const err = await response.json();
+        setMensaje({ text: err.mensaje || err.message || 'Error al procesar la recarga', type: 'error' });
       }
-    } catch {
-      setMensaje('Error en la conexión.');
-      setMensajeColor('text-blue-400');
+    } catch (error) {
+      setMensaje({ text: 'Error al conectar con el servidor', type: 'error' });
+    } finally {
+      setSaving(false);
     }
-  };
-
-  // Eliminar transacción
-  const eliminarTransaccion = async (id) => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${id}`, {
-        method: 'DELETE',
-      });
-      if (response.ok) {
-        setMensaje('Transacción eliminada correctamente.');
-        setMensajeColor('text-green-400');
-        // Refrescar la lista
-        setCurrentPage(0);
-        fetchTransacciones(0, true);
-      } else {
-        const errorData = await response.json();
-        setMensaje(`Error: ${errorData.message}`);
-        setMensajeColor('text-red-400');
-      }
-    } catch {
-      setMensaje('Error en la conexión.');
-      setMensajeColor('text-blue-400');
-    }
-  };
-
-  const handleOpenModal = (transaccion) => {
-    setTransaccionSeleccionada(transaccion);
-    setModalVisible(true);
-  };
-
-  const handleCloseModal = () => {
-    setModalVisible(false);
-    setTransaccionSeleccionada(null);
-  };
-
-  // Función para obtener el ID del usuario de diferentes formas
-  const getUsuarioId = (transaccion) => {
-    if (!transaccion || !transaccion.usuario_id) return 'N/A';
-    
-    if (typeof transaccion.usuario_id === 'object') {
-      return transaccion.usuario_id._id || 'N/A';
-    }
-    return transaccion.usuario_id || 'N/A';
-  };
-
-  // Función para obtener el nombre del usuario si está disponible
-  const getUsuarioNombre = (transaccion) => {
-    if (typeof transaccion.usuario_id === 'object') {
-      return transaccion.usuario_id.nombre || 'N/A';
-    }
-    return 'N/A';
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-blue-900 text-white p-4">
-      <form className="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-lg border border-blue-700" onSubmit={handleSubmit}>
-        <h2 className="text-3xl font-extrabold mb-6 text-center flex items-center justify-center text-blue-400 drop-shadow">
-          <PlusCircle className="mr-2 w-8 h-8" /> Recargar Billetera
-        </h2>
-        {mensaje && <p className={`mb-4 ${mensajeColor} text-center font-semibold`}>{mensaje}</p>}
-        
-        <div className="mb-6">
-          <label className="block mb-2 font-semibold text-blue-300" htmlFor="monto">Monto a Recargar</label>
-          <input
-            type="number" id="monto" value={monto} onChange={(e) => setMonto(e.target.value)}
-            className="w-full p-3 rounded-lg bg-gray-700 text-white border border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            required min="1" placeholder="Ej: 100" />
+    <div className="min-h-screen bg-[#06110D] text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-white">
+      <Background />
+
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 flex-grow w-full">
+        {/* Banner Superior */}
+        <div className="relative rounded-3xl p-6 sm:p-8 mb-8 overflow-hidden border border-emerald-500/25 bg-gradient-to-r from-[#0B251B] via-[#091F17] to-[#071711] shadow-2xl shadow-emerald-950/40">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
+
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold mb-3">
+              <Wallet className="h-3.5 w-3.5" />
+              <span>Abonos Directos a Billetera</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-heading">
+              Recargar Billetera Individual
+            </h1>
+            <p className="text-slate-300 text-sm sm:text-base mt-2 max-w-2xl leading-relaxed">
+              Abona saldo en COP a la billetera activa de cualquier socio y consulta el historial de recargas realizadas.
+            </p>
+          </div>
         </div>
 
-        <div className="mb-4">
-          <label className="block mb-2 font-semibold text-blue-300" htmlFor="userId">ID del Usuario a Recargar</label>
-          <input
-            type="text" id="userId" value={usuarioId} onChange={(e) => setUsuarioId(e.target.value)}
-            className="w-full p-3 rounded-lg bg-gray-700 text-white border border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            required placeholder="Ingresa el ID del usuario" />
-        </div>
+        {/* Notificación Toast */}
+        {mensaje && (
+          <div className={`mb-6 p-4 rounded-2xl text-center font-bold text-sm border shadow-2xl flex items-center justify-center gap-2.5 animate-fade-in ${
+            mensaje.type === 'success' 
+              ? 'bg-[#0E241C] border-emerald-500 text-emerald-300 shadow-emerald-950/50' 
+              : 'bg-[#2A0E12] border-rose-500 text-rose-300'
+          }`}>
+            {mensaje.type === 'success' ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+            <span>{mensaje.text}</span>
+          </div>
+        )}
 
-        {usuarioId && (
-          <div className="mb-6">
-            {loadingUsuario ? (
-              <div className="bg-blue-700 text-white rounded-lg p-3 text-center font-semibold shadow">Cargando usuario...</div>
-            ) : usuarioInfo ? (
-              <div className="flex items-center gap-4 bg-gradient-to-r from-blue-800 to-blue-600 rounded-xl p-4 shadow-lg border border-blue-400">
-                <UserCircle2 className="w-12 h-12 text-white drop-shadow" />
-                <div>
-                  <div className="font-bold text-lg text-white">{usuarioInfo.nombre_completo}</div>
-                  <div className="text-blue-200 font-mono">@{usuarioInfo.nombre_usuario}</div>
-                  <div className="text-xs text-blue-100 mt-1">ID: <span className="font-mono">{usuarioInfo._id}</span></div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+          {/* Formulario de Recarga */}
+          <div className="glass-card rounded-3xl border border-emerald-500/20 bg-[#0A1812]/85 p-6 sm:p-7 shadow-xl">
+            <h2 className="text-lg font-bold text-white font-heading mb-4 flex items-center gap-2">
+              <PlusCircle className="h-5 w-5 text-emerald-400" />
+              <span>Nuevo Abono Directo</span>
+            </h2>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">ID del Inversionista</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ingresa ID del usuario..."
+                    value={usuarioId}
+                    onChange={(e) => setUsuarioId(e.target.value)}
+                    className="w-full p-3 rounded-xl bg-slate-900 border border-emerald-500/20 text-white text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                  {loadingUsuario && (
+                    <Loader2 className="absolute right-3 top-3.5 h-4 w-4 animate-spin text-emerald-400" />
+                  )}
                 </div>
               </div>
-            ) : (
-              <div className="bg-red-700 text-white rounded-lg p-3 text-center font-semibold shadow">Usuario no encontrado</div>
-            )}
-          </div>
-        )}
 
-        <button type="submit"
-          className="bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3 px-4 rounded-lg w-full hover:from-blue-700 hover:to-blue-600 transition-all font-bold shadow-lg mt-2"
-          disabled={loadingUsuario || !usuarioInfo}>
-          {loadingUsuario ? 'Cargando...' : 'Recargar Billetera'}
-        </button>
-      </form>
-
-      {/* SECCIÓN DE LISTA Y FILTRO */}
-      <div className="w-full max-w-lg mt-12">
-        <h2 className="text-2xl font-bold text-center text-blue-300 drop-shadow">
-          Transacciones de Recarga
-          <span className="ml-2 text-sm text-gray-300">
-            ({transacciones.length} de {totalTransacciones} recargas cargadas)
-          </span>
-        </h2>
-        
-        {/* Input para filtrar */}
-        <div className="mt-4 mb-4 relative">
-          <label htmlFor="filtroUsuario" className="sr-only">Filtrar por ID de Usuario</label>
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5"/>
-          <input
-            id="filtroUsuario"
-            type="text"
-            value={filtroUsuarioId}
-            onChange={(e) => setFiltroUsuarioId(e.target.value)}
-            placeholder="Filtrar por ID de usuario..."
-            className="w-full p-3 pl-10 rounded-lg bg-gray-700 text-white border border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
-
-        <div
-          className="w-full h-[400px] overflow-y-auto"
-          ref={listRef}
-          style={{ borderRadius: '1rem', border: '1px solid #2563eb', background: '#1f2937' }}
-        >
-          {loadingTransacciones && transacciones.length === 0 ? (
-            <div className="p-4 text-center text-blue-200">Cargando transacciones...</div>
-          ) : (
-            <ul className="divide-y divide-blue-900/50">
-              {transacciones.length === 0 ? (
-                <li className="p-4 text-center text-blue-200">
-                  {filtroUsuarioId ? 'No se encontraron recargas para este usuario.' : 'No hay transacciones de recarga.'}
-                </li>
-              ) : (
-                transacciones.map((transaccion, index) => {
-                  const isLastItem = index === transacciones.length - 1;
-                  const usuarioId = getUsuarioId(transaccion);
-
-                  return (
-                    <li 
-                      key={transaccion._id} 
-                      className="flex justify-between items-center p-4 hover:bg-blue-900/30 transition-colors"
-                    >
-                      <div className="flex-1 overflow-hidden">
-                        <p className="font-semibold text-blue-200 truncate">{transaccion.descripcion}</p>
-                        <p className="text-sm text-gray-400 font-mono break-words">ID Usuario: {usuarioId}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {transaccion.fecha ? new Date(transaccion.fecha).toLocaleString('es-ES', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          }) : 'N/A'}
-                        </p>
-                      </div>
-                      <div className="flex items-center ml-4">
-                        <button onClick={() => handleOpenModal(transaccion)} className="text-green-400 hover:text-green-300 mr-2 transition">
-                          <Eye className="w-5 h-5" />
-                        </button>
-                        <button onClick={() => eliminarTransaccion(transaccion._id)} className="text-red-400 hover:text-red-300 transition">
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })
+              {usuarioInfo && (
+                <div className="p-3.5 rounded-2xl bg-[#07130E] border border-emerald-500/20 text-xs space-y-1">
+                  <p className="font-bold text-white text-sm">{usuarioInfo.nombre_completo}</p>
+                  <p className="text-slate-400">Usuario: <strong className="text-emerald-300">@{usuarioInfo.nombre_usuario}</strong></p>
+                  <p className="text-slate-400">Nivel: <strong className="text-teal-300">Nivel {usuarioInfo.nivel || 1}</strong></p>
+                </div>
               )}
-              
-              {/* Indicadores de carga y estado */}
-              {loadingMore && (
-                <li className="p-4 text-center text-blue-200">
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400 mr-2"></div>
-                    Cargando más recargas...
-                  </div>
-                </li>
-              )}
-              
-              {!hasMore && transacciones.length > 0 && (
-                <li className="p-4 text-center text-blue-400 font-semibold">Fin de los resultados</li>
-              )}
-            </ul>
-          )}
-        </div>
 
-        {/* Botón para cargar más manualmente */}
-        {!loadingMore && hasMore && transacciones.length > 0 && (
-          <div className="mt-4 text-center">
-            <button
-              onClick={loadMoreTransacciones}
-              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg transition-colors"
-            >
-              Cargar más recargas
-            </button>
-          </div>
-        )}
-      </div>
-
-      {modalVisible && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-          <div className="bg-gray-900 p-8 rounded-2xl w-11/12 max-w-md border-2 border-blue-700 shadow-2xl relative">
-            <h3 className="text-xl font-bold mb-4 text-blue-300">Detalles de la Transacción</h3>
-            {transaccionSeleccionada && (
-              <div className="space-y-2 text-white">
-                <p><span className="font-semibold text-blue-200">ID Transacción:</span> <span className="font-mono break-all">{transaccionSeleccionada._id}</span></p>
-                <p><span className="font-semibold text-blue-200">ID Usuario:</span> <span className="font-mono break-all">{getUsuarioId(transaccionSeleccionada)}</span></p>
-                <p><span className="font-semibold text-blue-200">Nombre Usuario:</span> {getUsuarioNombre(transaccionSeleccionada)}</p>
-                <p><span className="font-semibold text-blue-200">Descripción:</span> {transaccionSeleccionada.descripcion}</p>
-                <p><span className="font-semibold text-blue-200">Monto:</span> <span className="font-mono text-green-400">${transaccionSeleccionada.monto?.toFixed(2) || '0.00'}</span></p>
-                <p><span className="font-semibold text-blue-200">Fecha:</span> {transaccionSeleccionada.fecha ? new Date(transaccionSeleccionada.fecha).toLocaleString('es-ES', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                }) : 'N/A'}</p>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Monto a Recargar (COP)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  placeholder="Ej: 50000"
+                  value={monto}
+                  onChange={(e) => setMonto(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-slate-900 border border-emerald-500/20 text-white text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
               </div>
+
+              <button
+                type="submit"
+                disabled={saving || !usuarioInfo}
+                className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
+                <span>Aplicar Recarga</span>
+              </button>
+            </form>
+          </div>
+
+          {/* Historial de Recargas */}
+          <div className="lg:col-span-2 glass-card rounded-3xl border border-emerald-500/20 bg-[#0A1812]/85 p-6 sm:p-7 shadow-xl flex flex-col justify-between">
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <h2 className="text-lg font-bold text-white font-heading flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-emerald-400" />
+                  <span>Historial de Recargas</span>
+                </h2>
+
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Filtrar por ID..."
+                    value={filtroUsuarioId}
+                    onChange={(e) => setFiltroUsuarioId(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-900 border border-emerald-500/20 rounded-xl text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {loadingTransacciones && transacciones.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-emerald-400" />
+                </div>
+              ) : transacciones.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-xs">
+                  No se encontraron recargas registradas.
+                </div>
+              ) : (
+                <ul className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                  {transacciones.map((t, idx) => {
+                    const usuario = typeof t.usuario_id === 'object' ? t.usuario_id?._id : (t.usuario_id || 'N/A');
+                    const montoFormat = t.monto ? Number(t.monto).toLocaleString('es-CO', { minimumFractionDigits: 2 }) : '0.00';
+
+                    return (
+                      <li
+                        key={`${t._id}-${idx}`}
+                        className="p-3.5 rounded-2xl bg-[#07130E] border border-emerald-500/15 flex items-center justify-between gap-3"
+                      >
+                        <div className="truncate">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-extrabold text-white text-sm">
+                              COP ${montoFormat}
+                            </span>
+                            <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                              {t.estado || 'Aprobado'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 font-mono mt-0.5 truncate">
+                            ID: {usuario} {t.descripcion && `• ${t.descripcion}`}
+                          </p>
+                        </div>
+
+                        {t.fecha && (
+                          <span className="text-[11px] text-slate-500 font-mono shrink-0">
+                            {new Date(t.fecha).toLocaleDateString('es-ES')}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {hasMore && transacciones.length > 0 && (
+              <button
+                onClick={() => fetchTransacciones(currentPage + 1, false)}
+                disabled={loadingMore}
+                className="mt-4 w-full py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-bold border border-emerald-500/20"
+              >
+                {loadingMore ? 'Cargando más...' : 'Cargar más recargas'}
+              </button>
             )}
-            <button onClick={handleCloseModal} className="mt-6 bg-gradient-to-r from-blue-600 to-blue-500 text-white py-2 px-6 rounded-lg hover:from-blue-700 hover:to-blue-600 transition-all font-bold shadow-lg w-full">
-              Cerrar
-            </button>
           </div>
         </div>
-      )}
+      </main>
 
-      <div className="mt-20 w-full">
-        <AdminNav />
-      </div>
+      <br /><br />
+      <AdminNav />
     </div>
   );
 };

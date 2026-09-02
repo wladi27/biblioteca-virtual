@@ -6,28 +6,36 @@ import {
   ArrowUpRight,
   CreditCard,
   Clipboard,
+  CheckCircle2,
   Loader2,
   Filter,
   Search,
-  Plus,
+  Wallet,
+  DollarSign,
+  TrendingUp,
+  ShieldCheck,
+  Clock,
+  Sparkles,
+  ExternalLink,
+  ChevronRight,
+  MessageCircle,
 } from "lucide-react";
 import { Background } from "../components/Background";
 import { MobileNav } from "../components/MobileNav";
-import { EnviarDineroModal } from "../components/EnviarDinero";
 import { RetirarDineroModal } from "../components/RetirarDinero";
 
 export default function WalletApp() {
   const [balance, setBalance] = useState(0);
-  const [billeteraActiva, setBilleteraActiva] = useState(false);
+  const [billeteraActiva, setBilleteraActiva] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [userId, setUserId] = useState("");
+  const [userName, setUserName] = useState("");
   const [walletId, setWalletId] = useState("");
   const [copied, setCopied] = useState(false);
-  const [historial, setHistorial] = useState([]);
-  const [filtro, setFiltro] = useState("todos");
+  const [historial, setHistorial] = useState<any[]>([]);
+  const [filtro, setFiltro] = useState<"todos" | "ingresos" | "gastos">("todos");
   const [busqueda, setBusqueda] = useState("");
-  const [showEnviarModal, setShowEnviarModal] = useState(false);
   const [showRetirarModal, setShowRetirarModal] = useState(false);
   const [tasaCambio, setTasaCambio] = useState(0);
   const [loadingTasa, setLoadingTasa] = useState(true);
@@ -35,19 +43,16 @@ export default function WalletApp() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
-  // Nuevo estado para el modal de restricción
-  const [showRestriccionModal, setShowRestriccionModal] = useState(false);
 
-  // Función para obtener la tasa de cambio
+  // Obtener tasa de cambio USD/COP
   const obtenerTasaCambio = async () => {
     setLoadingTasa(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/dolar`
-      );
+      const apiUrl = import.meta.env.VITE_URL_LOCAL || import.meta.env.VITE_API_URL || 'http://localhost:5005';
+      const response = await fetch(`${apiUrl}/api/dolar`);
       if (response.ok) {
         const data = await response.json();
-        setTasaCambio(data.value);
+        setTasaCambio(data.value || 0);
       }
     } catch (error) {
       console.error("Error al obtener tasa de cambio:", error);
@@ -56,14 +61,12 @@ export default function WalletApp() {
     }
   };
 
-  // Convertir el saldo a dólares
-  const convertirADolares = (saldo) => {
+  const convertirADolares = (saldo: number) => {
     if (tasaCambio === 0) return 0;
     return saldo / tasaCambio;
   };
 
-  // Formatear el saldo según la moneda seleccionada
-  const formatearSaldo = (saldo) => {
+  const formatearSaldoUSD = (saldo: number) => {
     const dolares = convertirADolares(saldo);
     return dolares.toLocaleString("en-US", {
       style: "currency",
@@ -73,8 +76,7 @@ export default function WalletApp() {
     });
   };
 
-  // Función para obtener historial con paginación
-  const obtenerHistorialTransacciones = async (usuarioId, page = 1, isLoadMore = false) => {
+  const obtenerHistorialTransacciones = async (usuarioId: string, page = 1, isLoadMore = false) => {
     if (isLoadMore) {
       setLoadingMore(true);
     } else {
@@ -82,642 +84,386 @@ export default function WalletApp() {
     }
 
     try {
+      const token = localStorage.getItem("token");
+      const apiUrl = import.meta.env.VITE_URL_LOCAL || import.meta.env.VITE_API_URL || 'http://localhost:5005';
       const queryParams = new URLSearchParams({
         page: page.toString(),
-        limit: '10'
+        limit: "10"
       });
 
-      // Si hay búsqueda, enviarla al backend
       if (busqueda) {
-        queryParams.append('search', busqueda);
+        queryParams.append("search", busqueda);
       }
-
-      console.log('Obteniendo transacciones - Página:', page, 'Búsqueda:', busqueda);
 
       const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/transacciones/transacciones/${usuarioId}?${queryParams}`
+        `${apiUrl}/api/transacciones/transacciones/${usuarioId}?${queryParams}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
       );
-      
+
       if (response.ok) {
         const data = await response.json();
-        console.log('Datos recibidos - Página:', page, 'HasMore:', data.paginacion.hasMore, 'Total:', data.paginacion.totalTransacciones);
+        const nuevasTransacciones = data.transacciones || [];
         
         if (isLoadMore) {
-          // Agregar nuevas transacciones al historial existente
-          setHistorial(prev => [...prev, ...data.transacciones]);
+          setHistorial(prev => [...prev, ...nuevasTransacciones]);
         } else {
-          // Reemplazar el historial completo
-          setHistorial(data.transacciones);
+          setHistorial(nuevasTransacciones);
         }
-        
-        setHasMore(data.paginacion.hasMore);
+
+        setHasMore(data.paginacion?.hasMore || false);
         setPagina(page);
-      } else {
-        console.error('Error en respuesta:', response.status);
       }
     } catch (error) {
-      console.error("Error al obtener el historial de transacciones:", error);
+      console.error("Error al obtener historial:", error);
     } finally {
       setLoadingHistorial(false);
       setLoadingMore(false);
     }
   };
 
-  // Función para cargar más transacciones
-  const cargarMasTransacciones = () => {
-    if (!loadingMore && hasMore && userId) {
-      console.log('Cargando página:', pagina + 1);
-      obtenerHistorialTransacciones(userId, pagina + 1, true);
-    }
-  };
-
-  useEffect(() => {
-    const usuario = localStorage.getItem("usuario");
-    if (usuario) {
-      const userData = JSON.parse(usuario);
-      setUserId(userData._id);
-      verificarBilletera(userData._id);
-      obtenerSaldoUsuario(userData._id);
-      obtenerHistorialTransacciones(userData._id, 1, false);
-      obtenerTasaCambio();
-    } else {
-      setLoading(false);
-    }
-  }, []);
-
-  // Resetear paginación cuando cambian los filtros o búsqueda
-  useEffect(() => {
-    if (userId) {
-      console.log('Filtro o búsqueda cambiada - reseteando paginación');
-      setPagina(1);
-      setHasMore(true);
-      setHistorial([]);
-      obtenerHistorialTransacciones(userId, 1, false);
-    }
-  }, [filtro, busqueda]);
-
-  const verificarBilletera = async (usuarioId) => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/billetera/estado/${usuarioId}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setBilleteraActiva(data.activa);
-        if (data.activa) {
-          obtenerDatosBilletera(usuarioId);
-        }
-      }
-    } catch (error) {
-      console.error("Error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const obtenerDatosBilletera = async (usuarioId) => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/billetera/wallet/${usuarioId}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setWalletId(data._id);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-    }
-  };
-
-  const obtenerSaldoUsuario = async (usuarioId) => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/usuarios/saldo/${usuarioId}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setBalance(data.saldo);
-      }
-    } catch (error) {
-      console.error("Error al obtener el saldo:", error);
-    }
-  };
-
-  const activarBilletera = async () => {
+  const obtenerDatosBilletera = async (usuarioId: string) => {
     setLoading(true);
-    setError("");
-
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_URL_LOCAL}/api/billetera/activar`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const token = localStorage.getItem("token");
+      const apiUrl = import.meta.env.VITE_URL_LOCAL || import.meta.env.VITE_API_URL || 'http://localhost:5005';
+      const response = await fetch(`${apiUrl}/api/billetera/wallet/${usuarioId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-      if (response.status === 201) {
-        const userData = JSON.parse(localStorage.getItem("usuario"));
-        setBilleteraActiva(true);
-        obtenerDatosBilletera(userData._id);
+      if (response.ok) {
+        const data = await response.json();
+        setBalance(data.billetera?.saldo || data.saldo || 0);
+        setBilleteraActiva(data.billetera?.activa !== false);
+        setWalletId(data.billetera?._id || "");
       } else {
-        throw new Error("Error al activar la billetera.");
+        setError("Error al cargar la información de la billetera");
       }
-    } catch (error) {
-      setError("Error al activar la billetera. Inténtalo de nuevo.");
-      console.error("Error al activar la billetera:", error);
+    } catch (err) {
+      console.error("Error al conectar con el servidor:", err);
+      setError("Error de conexión");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEnviarDinero = async ({ destinatarioId, monto, notas }) => {
-    try {
-      const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
-      const token = localStorage.getItem("token");
-      
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/enviar`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          destinatario_id: destinatarioId,
-          monto,
-          notas
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.mensaje || "Error al enviar el dinero");
-      }
-
-      await obtenerSaldoUsuario(usuario._id);
-      // Recargar historial desde el inicio después de una transacción
-      setPagina(1);
-      setHasMore(true);
-      setHistorial([]);
-      await obtenerHistorialTransacciones(usuario._id, 1, false);
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const handleRetirarDinero = async ({ monto, notas }) => {
-    try {
-      const usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
-      const token = localStorage.getItem("token");
-      
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/api/billetera/retirar`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          monto,
-          notas
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.mensaje || "Error al retirar el dinero");
-      }
-
-      await obtenerSaldoUsuario(usuario._id);
-      // Recargar historial desde el inicio después de una transacción
-      setPagina(1);
-      setHasMore(true);
-      setHistorial([]);
-      await obtenerHistorialTransacciones(usuario._id, 1, false);
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  // Función para manejar el clic en enviar - MUESTRA EL MODAL DE RESTRICCIÓN
-  const handleEnviarClick = () => {
-    setShowRestriccionModal(true);
-  };
-
-  // Función para cerrar el modal de restricción
-  const closeRestriccionModal = () => {
-    setShowRestriccionModal(false);
+  const handleBuscar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPagina(1);
+    setHasMore(true);
+    setHistorial([]);
+    await obtenerHistorialTransacciones(userId, 1, false);
   };
 
   const copiarAlPortapapeles = () => {
     if (userId) {
-      navigator.clipboard
-        .writeText(userId)
-        .then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        })
-        .catch((err) => {
-          console.error("Error al copiar: ", err);
-        });
+      navigator.clipboard.writeText(userId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const obtenerTamañoFuenteSaldo = (saldo) => {
-    const longitud = saldo.toString().length;
-    return `${Math.max(2.5 - longitud * 0.1, 1.2)}rem`;
-  };
+  const transaccionesFiltradas = historial.filter((t) => {
+    if (filtro === "ingresos") return t.tipo !== "retiro" && t.tipo !== "envio";
+    if (filtro === "gastos") return t.tipo === "retiro" || t.tipo === "envio";
+    return true;
+  });
 
-  // Filtrar transacciones localmente solo por tipo (ingresos/gastos)
-  const filtrarTransacciones = () => {
-    let transaccionesFiltradas = [...(historial || [])];
-
-    if (filtro !== "todos") {
-      transaccionesFiltradas = transaccionesFiltradas.filter((t) => {
-        if (filtro === "ingresos") {
-          return t.tipo === "recarga" || t.tipo === "recibido";
-        }
-        if (filtro === "gastos") {
-          return t.tipo === "retiro" || t.tipo === "envio";
-        }
-        return true;
+  const formatearFecha = (fechaISO: string) => {
+    try {
+      return new Date(fechaISO).toLocaleDateString("es-ES", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
       });
+    } catch {
+      return fechaISO;
     }
-
-    return transaccionesFiltradas;
   };
 
-  const formatearFecha = (fechaISO) => {
-    const opciones = { day: "2-digit", month: "short", year: "numeric" };
-    return new Date(fechaISO).toLocaleDateString("es-ES", opciones);
+  const formatearHora = (fechaISO: string) => {
+    try {
+      return new Date(fechaISO).toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return "";
+    }
   };
 
-  const formatearHora = (fechaISO) => {
-    return new Date(fechaISO).toLocaleTimeString("es-ES", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  if (loading || loadingTasa) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-white">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin mx-auto text-blue-500" />
-          <p className="mt-4">Cargando información de tu billetera...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const transaccionesFiltradas = filtrarTransacciones();
+  useEffect(() => {
+    const raw = localStorage.getItem("usuario");
+    if (raw) {
+      try {
+        const user = JSON.parse(raw);
+        setUserId(user._id);
+        setUserName(user.nombre_completo || user.nombre_usuario || "Inversionista");
+        obtenerDatosBilletera(user._id);
+        obtenerHistorialTransacciones(user._id, 1, false);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    obtenerTasaCambio();
+  }, []);
 
   return (
-    <div className="min-h-screen flex flex-col text-white">
+    <div className="min-h-screen bg-[#06110D] text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-white">
       <Background />
 
-      <main className="flex-grow container max-w-md mx-auto px-4 py-8">
-        {/* Encabezado */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Mi Billetera</h1>
-            <p className="text-gray-400">
-              Administra tus fondos y transacciones
-            </p>
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-grow w-full">
+        {/* Cabecera de Billetera con Skeleton */}
+        {loading ? (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 animate-pulse">
+            <div className="space-y-2">
+              <div className="h-5 w-44 bg-emerald-500/20 rounded-full"></div>
+              <div className="h-8 w-64 bg-slate-700 rounded-xl"></div>
+              <div className="h-4 w-80 max-w-full bg-slate-800 rounded"></div>
+            </div>
+            <div className="h-8 w-36 bg-emerald-500/20 rounded-full"></div>
           </div>
-          <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
-            <CreditCard className="h-5 w-5" />
-          </div>
-        </div>
-
-        {!billeteraActiva ? (
-          /* Tarjeta de activación */
-          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl shadow-xl overflow-hidden border border-gray-700 mb-6">
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="h-12 w-12 rounded-full bg-blue-500/20 flex items-center justify-center">
-                  <CreditCard className="h-6 w-6 text-blue-400" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold">Activa tu billetera</h2>
-                  <p className="text-gray-400 text-sm">
-                    Para comenzar a realizar transacciones
-                  </p>
-                </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-semibold mb-2">
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Billetera Agro-Digital</span>
               </div>
-
-              <p className="text-gray-300 mb-6">
-                Tu billetera no está activada. Actívala ahora para empezar a
-                enviar y recibir pagos.
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-heading">
+                Mi Billetera y Fondos
+              </h1>
+              <p className="text-slate-400 text-sm mt-1">
+                Gestiona tus rendimientos acumulados, solicita retiros bancarios y consulta tus movimientos.
               </p>
+            </div>
 
-              <button
-                onClick={activarBilletera}
-                disabled={loading}
-                className="w-full py-3 px-6 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Activando...
-                  </>
-                ) : (
-                  "Activar Billetera"
-                )}
-              </button>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                Billetera Activa
+              </span>
+            </div>
+          </div>
+        )}
 
-              {error && (
-                <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
-                  {error}
-                </div>
-              )}
+        {/* Tarjeta Principal de Balance con Skeleton */}
+        {loading ? (
+          <div className="relative rounded-3xl p-6 sm:p-8 mb-8 overflow-hidden border border-emerald-500/20 bg-gradient-to-br from-[#0B251B] via-[#091F17] to-[#071711] shadow-2xl animate-pulse">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 mb-6">
+              <div className="space-y-3">
+                <div className="h-4 w-40 bg-emerald-500/20 rounded"></div>
+                <div className="h-12 w-64 bg-slate-700 rounded-xl"></div>
+                <div className="h-4 w-52 bg-slate-800 rounded"></div>
+              </div>
+              <div className="h-14 w-14 rounded-2xl bg-emerald-500/20"></div>
+            </div>
+            <div className="pt-6 border-t border-emerald-500/15 flex justify-between items-center">
+              <div className="h-8 w-48 bg-slate-800 rounded-xl"></div>
+              <div className="h-10 w-44 bg-emerald-500/20 rounded-xl"></div>
             </div>
           </div>
         ) : (
-          /* Billetera activa */
-          <>
-            {/* Tarjeta de balance - Mejorada */}
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl shadow-xl overflow-hidden border border-gray-700 mb-6 relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-purple-900/10 opacity-30"></div>
-              <div className="relative z-10 p-6">
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <p className="text-gray-400 text-sm">Balance disponible</p>
-                    <div className="flex items-center gap-2">
-                      <h2
-                        className="font-bold mt-1"
-                        style={{ fontSize: obtenerTamañoFuenteSaldo(balance) }}
-                      >
-                        {formatearSaldo(balance)}
-                      </h2>
-                    </div>
-                    {tasaCambio > 0 && (
-                      <p className="text-gray-400 text-xs mt-1">
-                        Tasa: 1 USD = {tasaCambio.toLocaleString("es-CO")} COP
-                      </p>
-                    )}
-                  </div>
-                  <div className="h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center">
-                    <CreditCard className="h-5 w-5 text-green-400" />
-                  </div>
+          <div className="relative rounded-3xl p-6 sm:p-8 mb-8 overflow-hidden border border-emerald-500/30 bg-gradient-to-br from-[#0B251B] via-[#091F17] to-[#071711] shadow-2xl shadow-emerald-950/50">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16"></div>
+
+            <div className="relative z-10">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 mb-6">
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-emerald-300 block mb-1">
+                    Saldo Total Disponible
+                  </span>
+                  <h2 className="text-3xl sm:text-5xl font-extrabold text-white font-mono tracking-tight">
+                    COP ${balance.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </h2>
+                  {tasaCambio > 0 && (
+                    <p className="text-slate-300 text-xs sm:text-sm mt-2 font-medium">
+                      ≈ {formatearSaldoUSD(balance)} USD • <span className="text-slate-400">TRM Ref: 1 USD = ${tasaCambio.toLocaleString("es-CO")} COP</span>
+                    </p>
+                  )}
                 </div>
 
-                {/* ID de usuario - Mejorado */}
-                <div className="bg-gray-800/50 rounded-lg p-4 mb-6 border border-gray-700/50">
-                  <p className="text-gray-400 text-sm mb-2">ID de tu Wallet</p>
-                  <div className="flex items-center justify-between bg-gray-900/30 rounded px-3 py-2">
-                    <p className="font-mono text-sm truncate">{userId}</p>
-                    <button
-                      onClick={copiarAlPortapapeles}
-                      className="text-blue-400 hover:text-blue-300 transition-colors ml-2 flex items-center"
-                      title="Copiar ID"
-                    >
-                      {copied ? (
-                        <span className="text-green-400 text-xs">¡Copiado!</span>
-                      ) : (
-                        <>
-                          <Clipboard className="h-4 w-4" />
-                          <span className="sr-only">Copiar ID</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
+                <div className="h-14 w-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                  <Wallet className="h-7 w-7" />
                 </div>
+              </div>
 
-                {/* Botones de acción - Mejorados */}
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Botón ENVIAR - muestra modal de restricción */}
+              {/* Fila inferior: ID de cuenta y Botón de Retiro */}
+              <div className="pt-6 border-t border-emerald-500/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-2 bg-[#05110D]/70 border border-emerald-500/20 rounded-xl px-3.5 py-2">
+                  <span className="text-xs text-slate-400">ID de Cuenta:</span>
+                  <span className="font-mono text-xs font-bold text-white truncate max-w-[140px] sm:max-w-[200px]">{userId}</span>
                   <button
-                    onClick={handleEnviarClick}
-                    className="bg-blue-600/90 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors shadow-md"
+                    onClick={copiarAlPortapapeles}
+                    className="p-1 rounded text-emerald-400 hover:text-emerald-300 hover:bg-white/5 transition-colors ml-1"
+                    title="Copiar ID"
                   >
-                    <ArrowUpRight className="h-4 w-4" />
-                    Enviar
+                    {copied ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> : <Clipboard className="h-3.5 w-3.5" />}
                   </button>
-                  
-                  {/* Botón RETIRAR - funciona normalmente */}
+                </div>
+
+                <div className="flex items-center gap-3">
                   <button
                     onClick={() => setShowRetirarModal(true)}
-                    className="bg-purple-600/90 hover:bg-purple-700 text-white py-3 px-4 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors shadow-md"
+                    className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/25"
                   >
                     <ArrowDownLeft className="h-4 w-4" />
-                    Retirar
+                    <span>Solicitar Retiro Bancario</span>
                   </button>
                 </div>
               </div>
             </div>
-
-            <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg flex items-center gap-2">
-                  <ArrowUpRight className="h-5 w-5 text-gray-400" />
-                  Historial de transacciones
-                </h3>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">
-                    {historial.length} transacciones cargadas
-                  </span>
-                  <button
-                    onClick={() =>
-                      setFiltro(
-                        filtro === "todos"
-                          ? "ingresos"
-                          : filtro === "ingresos"
-                          ? "gastos"
-                          : "todos"
-                      )
-                    }
-                    className="flex items-center gap-1 text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full transition-colors"
-                  >
-                    <Filter className="h-4 w-4" />
-                    <span>
-                      {filtro === "todos"
-                        ? "Todos"
-                        : filtro === "ingresos"
-                        ? "Ingresos"
-                        : "Gastos"}
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Barra de búsqueda */}
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar transacciones..."
-                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      setPagina(1);
-                      setHasMore(true);
-                      setHistorial([]);
-                      obtenerHistorialTransacciones(userId, 1, false);
-                    }
-                  }}
-                />
-              </div>
-
-              {/* Lista de transacciones */}
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {loadingHistorial && pagina === 1 ? (
-                  <div className="text-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-blue-500" />
-                    <p className="text-gray-400 mt-2">Cargando transacciones...</p>
-                  </div>
-                ) : transaccionesFiltradas.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 bg-gray-700/30 rounded-lg">
-                    <p>No se encontraron transacciones</p>
-                  </div>
-                ) : (
-                  <>
-                    {transaccionesFiltradas.map((transaccion) => (
-                      <div
-                        key={transaccion._id}
-                        className="bg-gray-700/50 hover:bg-gray-700/70 rounded-lg p-4 border border-gray-600/30 transition-colors"
-                      >
-                        <div className="flex flex-col">
-                          <h4 className="font-medium">
-                            {transaccion.descripcion}
-                          </h4>
-                          <p className="text-gray-400 text-xs mt-1">
-                            {formatearFecha(transaccion.fecha)} ·{" "}
-                            {formatearHora(transaccion.fecha)}
-                          </p>
-                          <p
-                            className={`font-semibold text-lg ${
-                              transaccion.tipo === "retiro" ||
-                              transaccion.tipo === "envio"
-                                ? "text-red-400"
-                                : "text-green-400"
-                            }`}
-                          >
-                            {transaccion.tipo === "retiro" ||
-                            transaccion.tipo === "envio"
-                              ? "-"
-                              : "+"}{" "}
-                            COP{" "}
-                            {transaccion.monto.toLocaleString("es-CO", {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </p>
-                        </div>
-                        {transaccion.notas && (
-                          <p className="text-gray-400 text-sm mt-2 italic">
-                            "{transaccion.notas}"
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-
-              {/* Botón para cargar más transacciones */}
-              {hasMore && historial.length > 0 && (
-                <div className="mt-4 flex justify-center">
-                  <button
-                    onClick={cargarMasTransacciones}
-                    disabled={loadingMore}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors"
-                  >
-                    {loadingMore ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Cargando...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="h-4 w-4" />
-                        Cargar más transacciones
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-
-              {/* Mensaje cuando no hay más transacciones */}
-              {!hasMore && historial.length > 0 && (
-                <div className="mt-4 text-center text-gray-500 text-sm">
-                  No hay más transacciones para mostrar
-                </div>
-              )}
-
-              {/* Información de paginación */}
-              <div className="mt-2 text-center text-xs text-gray-400">
-                Página {pagina} • {historial.length} transacciones cargadas
-                {hasMore && " • Hay más transacciones disponibles"}
-              </div>
-            </div>
-          </>
+          </div>
         )}
-      </main>
 
-      {/* Modales */}
-      {showEnviarModal && (
-        <EnviarDineroModal
-          walletId={walletId}
-          balance={balance}
-          onClose={() => setShowEnviarModal(false)}
-          onEnviar={handleEnviarDinero}
-        />
-      )}
-
-      {showRetirarModal && (
-        <RetirarDineroModal
-          walletId={walletId}
-          balance={balance}
-          onClose={() => setShowRetirarModal(false)}
-          onRetirar={handleRetirarDinero}
-        />
-      )}
-
-      {/* Modal de Restricción para Envíos */}
-      {showRestriccionModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-xl max-w-sm w-full p-6 border border-gray-700">
-            <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-500/20 mb-4">
-                <svg 
-                  className="h-6 w-6 text-yellow-500" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                >
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" 
-                  />
-                </svg>
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2">
-                Función No Disponible
-              </h3>
-              <p className="text-gray-300 mb-6">
-                Esta opción solo está habilitada para comercios registrados.
+        {/* Historial de Transacciones */}
+        <div className="glass-card rounded-3xl border border-emerald-500/20 bg-[#0A1812]/80 overflow-hidden shadow-xl">
+          <div className="p-6 sm:p-7 border-b border-emerald-500/15 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold text-white font-heading">
+                Movimientos de Cuenta
+              </h2>
+              <p className="text-xs text-slate-400">
+                Historial de rendimientos, recargas y retiros
               </p>
+            </div>
+
+            {/* Filtros de Ingresos / Gastos */}
+            <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={closeRestriccionModal}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+                onClick={() => setFiltro("todos")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  filtro === "todos"
+                    ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                    : "bg-slate-900/80 text-slate-400 hover:text-white border border-emerald-500/10"
+                }`}
               >
-                Entendido
+                Todos
+              </button>
+              <button
+                onClick={() => setFiltro("ingresos")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  filtro === "ingresos"
+                    ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                    : "bg-slate-900/80 text-slate-400 hover:text-white border border-emerald-500/10"
+                }`}
+              >
+                Rendimientos
+              </button>
+              <button
+                onClick={() => setFiltro("gastos")}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  filtro === "gastos"
+                    ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                    : "bg-slate-900/80 text-slate-400 hover:text-white border border-emerald-500/10"
+                }`}
+              >
+                Retiros
               </button>
             </div>
           </div>
+
+          {/* Lista de Transacciones con Skeletons */}
+          <div className="p-4 sm:p-6">
+            {loadingHistorial || loading ? (
+              <div className="space-y-3 py-2 animate-pulse">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={`skel-tx-${i}`} className="p-4 rounded-2xl bg-[#07130E] border border-emerald-500/10 flex items-center justify-between">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20"></div>
+                      <div className="space-y-1.5">
+                        <div className="h-4 w-40 bg-emerald-500/20 rounded"></div>
+                        <div className="h-3 w-28 bg-slate-800 rounded"></div>
+                      </div>
+                    </div>
+                    <div className="h-6 w-24 bg-slate-700 rounded-lg"></div>
+                  </div>
+                ))}
+              </div>
+            ) : transaccionesFiltradas.length > 0 ? (
+              <div className="space-y-3">
+                {transaccionesFiltradas.map((t) => {
+                  const esIngreso = t.tipo !== "retiro" && t.tipo !== "envio";
+                  const monto = Number(t.monto?.$numberDecimal || t.monto || 0);
+
+                  return (
+                    <div
+                      key={t._id}
+                      className="p-4 rounded-2xl bg-[#0D2018]/60 border border-emerald-500/15 hover:border-emerald-500/30 transition-all flex items-center justify-between gap-4 group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 ${
+                          esIngreso
+                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                            : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                        }`}>
+                          {esIngreso ? <ArrowDownLeft className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
+                        </div>
+                        <div className="truncate">
+                          <p className="font-bold text-white text-sm truncate group-hover:text-emerald-300 transition-colors">
+                            {t.descripcion || (esIngreso ? "Rendimiento acreditado" : "Retiro bancario")}
+                          </p>
+                          <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5 font-mono">
+                            <span>{formatearFecha(t.fecha || t.createdAt)}</span>
+                            <span>•</span>
+                            <span>{formatearHora(t.fecha || t.createdAt)}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className={`text-base sm:text-lg font-extrabold font-mono ${
+                          esIngreso ? "text-emerald-400" : "text-amber-400"
+                        }`}>
+                          {esIngreso ? "+" : "-"}COP ${monto.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold mt-0.5">
+                          {t.estado || "Completado"}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {hasMore && (
+                  <div className="pt-4 text-center">
+                    <button
+                      onClick={() => obtenerHistorialTransacciones(userId, pagina + 1, true)}
+                      disabled={loadingMore}
+                      className="px-5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs transition-colors"
+                    >
+                      {loadingMore ? "Cargando más..." : "Cargar más transacciones"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-slate-400 text-sm">No hay transacciones registradas en este filtro.</p>
+              </div>
+            )}
+          </div>
         </div>
+      </main>
+
+      {/* Modal de Retiro */}
+      {showRetirarModal && (
+        <RetirarDineroModal
+          saldoDisponible={balance}
+          onClose={() => setShowRetirarModal(false)}
+          onSuccess={() => {
+            setShowRetirarModal(false);
+            if (userId) {
+              obtenerDatosBilletera(userId);
+              obtenerHistorialTransacciones(userId, 1, false);
+            }
+          }}
+        />
       )}
 
-      <br />
-      <br />
-      <MobileNav billeteraActiva={billeteraActiva} />
+      <br /><br />
+      <MobileNav />
     </div>
   );
 }

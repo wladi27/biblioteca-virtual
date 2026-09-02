@@ -2,64 +2,48 @@ import React, { useEffect, useState } from "react";
 import { Background } from "../components/Background";
 import { MobileNav } from "../components/MobileNav";
 import { NivelAlcanzadoComisiones } from "../components/NIvelAlcanzadoComisiones";
+import { DollarSign, Sprout, ShieldCheck, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export const Comisiones = () => {
   const [username, setUsername] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     const usuario = localStorage.getItem("usuario");
     if (usuario) {
-      const userData = JSON.parse(usuario);
-      setUsername(userData.username);
+      try {
+        const userData = JSON.parse(usuario);
+        setUsername(userData.nombre_completo || userData.nombre_usuario || "Inversionista");
+      } catch (e) {
+        console.error(e);
+      }
     }
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col text-white">
+    <div className="min-h-screen bg-[#06110D] text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-white">
       <Background />
-      
-      {/* Contenedor principal centrado */}
-      <main className="flex-grow flex flex-col items-center justify-start py-8 px-4 sm:px-6 lg:px-8">
-        {/* Tarjeta contenedora con ancho máximo y responsive */}
-        <div className="w-full max-w-6xl bg-gray-800 bg-opacity-80 rounded-xl shadow-2xl overflow-hidden">
-          {/* Encabezado con gradiente */}
-          <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
-            <h1 className="text-3xl sm:text-4xl font-bold text-center text-white">
-              Mis Comisiones
-            </h1>
-            
-          </div>
-          
-          {/* Contenido principal */}
-          <div className="p-6">
-            {/* Sección de estadísticas rápidas */}
-            
 
-            {/* Sección de niveles de comisiones */}
-            <div className="mb-6">
-              
-              <div className="space-y-4">
-                <NivelAlcanzadoComisiones />
-              </div>
-            </div>
-
-            {/* Mensajes de estado */}
-            {loading && (
-              <div className="flex justify-center items-center py-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-              </div>
-            )}
-            {error && (
-              <div className="bg-red-500 bg-opacity-20 text-red-200 p-4 rounded-lg border border-red-400">
-                {error}
-              </div>
-            )}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-grow w-full">
+        {/* Cabecera de Página */}
+        <div className="mb-8">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-semibold mb-2">
+            <Sprout className="h-3.5 w-3.5" />
+            <span>Plan de Rendimientos y Matriz</span>
           </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-heading">
+            Mis Comisiones de Co-Inversión
+          </h1>
+          <p className="text-slate-300 text-sm sm:text-base mt-2 max-w-2xl leading-relaxed">
+            Monitorea el plan de compensación de los 12 niveles de <strong className="text-emerald-400 font-medium">Granja Raíz de Vida</strong>. Cada nivel completado acredita rendimientos directamente a tu billetera digital.
+          </p>
         </div>
+
+        {/* Componente de Niveles y Comisiones */}
+        <NivelAlcanzadoComisiones />
       </main>
 
+      <br /><br />
       <MobileNav />
     </div>
   );

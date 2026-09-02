@@ -1,194 +1,202 @@
 import React, { useEffect, useState } from 'react';
 import { Background } from '../components/Background';
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
-import { User } from 'lucide-react';
+import { User, Users, CheckCircle2, Sprout, Layers, Loader2, Search, Award, TrendingUp, ShieldCheck } from 'lucide-react';
 import { MobileNav } from '../components/MobileNav';
+
+interface MiembroRed {
+  _id: string;
+  nombre_usuario: string;
+  nivel: number;
+}
+
+const nombresNiveles: Record<number, string> = {
+  1: 'Semilla',
+  2: 'Brote',
+  3: 'Cultivo',
+  4: 'Cosecha',
+  5: 'Productor',
+  6: 'Agro-Líder',
+  7: 'Finca Master',
+  8: 'Hacienda',
+  9: 'Agro-Corporativo',
+  10: 'Valle Verde',
+  11: 'Raíz de Vida',
+  12: 'Raíz de Vida Master'
+};
 
 export const Red = () => {
   const [username, setUsername] = useState('');
   const [userId, setUserId] = useState('');
-  const [nivelUsuario, setNivelUsuario] = useState(0);
   const [nivelesCompletados, setNivelesCompletados] = useState(0);
-  const [openAcordeon, setOpenAcordeon] = useState({});
+  const [totalDescendientes, setTotalDescendientes] = useState(0);
+  const [openAcordeon, setOpenAcordeon] = useState<Record<number, boolean>>({ 1: true });
   const [loading, setLoading] = useState(true);
-  const [nivelesOrganizados, setNivelesOrganizados] = useState({});
-  const [loadingNivel, setLoadingNivel] = useState({});
-  const [nivelCache, setNivelCache] = useState({});
+  const [nivelesOrganizados, setNivelesOrganizados] = useState<Record<number, MiembroRed[]>>({});
+  const [busqueda, setBusqueda] = useState('');
+
+  const cargarRedCompleta = async (idUsuario: string) => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = import.meta.env.VITE_URL_LOCAL || import.meta.env.VITE_API_URL || 'http://localhost:5005';
+
+      const response = await fetch(`${apiUrl}/usuarios/piramide-red/${idUsuario}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Organizar niveles del 1 al 12
+        const niveles: Record<number, MiembroRed[]> = {};
+        for (let i = 1; i <= 12; i++) {
+          niveles[i] = data.niveles?.[i] || [];
+        }
+
+        setNivelesOrganizados(niveles);
+        setNivelesCompletados(data.nivelesCompletados || 0);
+        setTotalDescendientes(data.piramide?.totalDescendientes || 0);
+      } else {
+        console.error('Error al obtener la red del usuario:', response.status);
+      }
+    } catch (error) {
+      console.error('Error cargando pirámide de red:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const usuario = localStorage.getItem('usuario');
     if (usuario) {
-      const userData = JSON.parse(usuario);
-      setUsername(userData.nombre_completo);
-      setUserId(userData._id);
-      setNivelUsuario(userData.nivel || 0);
-      
-      // Inicializar niveles vacíos
-      const nivelesVacios = {};
-      for (let i = 1; i <= 12; i++) {
-        nivelesVacios[i] = [];
+      try {
+        const userData = JSON.parse(usuario);
+        setUsername(userData.nombre_completo || userData.nombre_usuario);
+        setUserId(userData._id);
+        cargarRedCompleta(userData._id);
+      } catch {
+        setLoading(false);
       }
-      setNivelesOrganizados(nivelesVacios);
-      setNivelCache({});
-      setOpenAcordeon({});
-      
+    } else {
       setLoading(false);
     }
   }, []);
 
-  const fetchNivelData = async (nivel) => {
-    if (!userId) return;
-
-    // Verificar caché primero
-    const cacheKey = `${userId}-${nivel}`;
-    if (nivelCache[cacheKey]) {
-      setNivelesOrganizados(prev => ({
-        ...prev,
-        [nivel]: nivelCache[cacheKey],
-      }));
-      return;
-    }
-
-    setLoadingNivel(prev => ({ ...prev, [nivel]: true }));
-    try {
-      const response = await fetch(`${import.meta.env.VITE_URL_LOCAL}/usuarios/piramide-nivel/${userId}/${nivel}`);
-      if (response.ok) {
-        const data = await response.json();
-        
-        setNivelesOrganizados(prev => ({
-          ...prev,
-          [nivel]: data.usuarios,
-        }));
-        
-        // Guardar en caché
-        setNivelCache(prev => ({
-          ...prev,
-          [cacheKey]: data.usuarios
-        }));
-
-        // Recalcular niveles completados
-        setNivelesOrganizados(prev => {
-          const nuevosNiveles = { ...prev, [nivel]: data.usuarios };
-          calcularNivelesCompletados(nuevosNiveles);
-          return nuevosNiveles;
-        });
-        
-      } else {
-        console.error(`Error fetching level ${nivel}`);
-      }
-    } catch (error) {
-      console.error(`Error fetching data for level ${nivel}:`, error);
-    } finally {
-      setLoadingNivel(prev => ({ ...prev, [nivel]: false }));
-    }
+  const toggleAcordeon = (nivel: number) => {
+    setOpenAcordeon(prev => ({ ...prev, [nivel]: !prev[nivel] }));
   };
 
-  const calcularNivelesCompletados = (niveles) => {
-    let completados = 0;
-    for (let nivel = 1; nivel <= 12; nivel++) {
-      const cantidadEsperada = Math.pow(3, nivel);
-      if (niveles[nivel] && niveles[nivel].length >= cantidadEsperada) {
-        completados++;
-      } else {
-        break;
-      }
-    }
-    setNivelesCompletados(completados);
-  };
+  const rangoActualNumero = nivelesCompletados > 0 ? nivelesCompletados : 1;
+  const rangoActualNombre = nombresNiveles[rangoActualNumero] || 'Semilla';
 
-  const toggleAcordeon = (nivel) => {
-    const isOpening = !openAcordeon[nivel];
-    setOpenAcordeon(prev => ({ ...prev, [nivel]: isOpening }));
-
-    if (isOpening && userId && nivelesOrganizados[nivel]?.length === 0) {
-      fetchNivelData(nivel);
-    }
-  };
-
-  const renderAcordeon = (nivel) => {
+  const renderAcordeon = (nivel: number) => {
     const data = nivelesOrganizados[nivel] || [];
     const cantidadEsperada = Math.pow(3, nivel);
     const completado = data.length >= cantidadEsperada;
+    const porcentaje = Math.min(100, Math.round((data.length / cantidadEsperada) * 100));
+    const nombreNivel = nombresNiveles[nivel] || `Nivel ${nivel}`;
+
+    // Filtrar usuarios si hay búsqueda
+    const usuariosFiltrados = busqueda
+      ? data.filter(u => u.nombre_usuario?.toLowerCase().includes(busqueda.toLowerCase()))
+      : data;
 
     return (
-      <div className="mb-3" key={`nivel-${nivel}`}>
+      <div className="mb-4" key={`nivel-${nivel}`}>
         <div
-          className={`p-3 rounded-lg flex justify-between items-center cursor-pointer ${
-            completado ? 'bg-green-900 bg-opacity-30' : 'bg-gray-800'
-          } hover:bg-opacity-70 transition-all`}
+          className={`p-4 rounded-2xl flex justify-between items-center cursor-pointer border transition-all ${
+            completado 
+              ? 'bg-[#0E241C]/80 border-emerald-500/40 shadow-lg shadow-emerald-500/5' 
+              : 'bg-[#0A1812]/70 border-emerald-500/15 hover:border-emerald-500/30'
+          }`}
           onClick={() => toggleAcordeon(nivel)}
         >
-          <div className="flex items-center gap-3">
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-              completado ? 'bg-green-500' : 'bg-gray-600'
+          <div className="flex items-center gap-3.5">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-mono font-bold text-sm ${
+              completado 
+                ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/30' 
+                : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
             }`}>
-              <span className="text-sm font-medium">{nivel}</span>
+              {nivel}
             </div>
             <div>
-              <h3 className="font-medium">Nivel {nivel}</h3>
-              <p className="text-xs text-gray-300">
-                {data.length} de {cantidadEsperada} usuarios
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-white text-base">
+                  Nivel {nivel}: <span className="text-emerald-400 font-semibold">{nombreNivel}</span>
+                </h3>
+                {completado && (
+                  <span className="flex items-center gap-1 text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Completo
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                <strong className="text-emerald-400">{data.length}</strong> de {cantidadEsperada.toLocaleString('es-CO')} cupos ocupados ({porcentaje}%)
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`text-xs px-2 py-1 rounded ${
-              completado ? 'bg-green-500 text-white' : 'bg-gray-600 text-gray-200'
-            }`}>
-              {completado ? 'Completo' : 'Pendiente'}
-            </span>
-            {openAcordeon[nivel] ? <FaChevronUp /> : <FaChevronDown />}
+
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:block w-28 bg-slate-900 rounded-full h-2 border border-emerald-500/10 overflow-hidden">
+              <div 
+                className="bg-emerald-400 h-full rounded-full transition-all duration-500"
+                style={{ width: `${porcentaje}%` }}
+              ></div>
+            </div>
+            <div className="p-2 rounded-lg bg-white/5 text-slate-400 hover:text-white">
+              {openAcordeon[nivel] ? <FaChevronUp className="h-3.5 w-3.5" /> : <FaChevronDown className="h-3.5 w-3.5" />}
+            </div>
           </div>
         </div>
         
         {openAcordeon[nivel] && (
-          <div className="mt-2 pl-10">
-            {loadingNivel[nivel] ? (
-              <div className="flex items-center justify-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500"></div>
-                <span className="ml-2">Cargando usuarios del nivel {nivel}...</span>
+          <div className="mt-3 pl-2 sm:pl-4">
+            {data.length === 0 ? (
+              <div className="p-4 rounded-xl bg-slate-900/40 border border-emerald-500/10 text-center text-slate-400 text-sm">
+                No hay miembros registrados aún en el Nivel {nivel} ({nombreNivel}).
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {data.map((usuario, index) => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {usuariosFiltrados.map((usuario, index) => (
                   <div 
                     key={`${usuario._id}-${index}`}
-                    className="p-2 bg-gray-800 rounded flex items-center gap-2 hover:bg-gray-700 transition-colors"
+                    className="p-3.5 bg-[#0D2018]/70 border border-emerald-500/20 rounded-xl flex items-center gap-3 hover:border-emerald-400/40 transition-all group"
                   >
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                      usuario.nivel <= 5 ? 'bg-blue-500' : 
-                      usuario.nivel <= 10 ? 'bg-purple-500' : 'bg-yellow-500'
-                    }`}>
-                      <span className="text-xs text-white font-medium">
-                        {usuario.nivel}
-                      </span>
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 flex items-center justify-center text-xs font-bold font-mono">
+                      #{index + 1}
                     </div>
                     <div className="truncate flex-1">
-                      <p className="text-sm font-medium">
-                        {usuario.nombre_usuario || `Usuario ${index+1}`}
+                      <p className="text-sm font-bold text-white group-hover:text-emerald-300 transition-colors">
+                        {usuario.nombre_usuario}
                       </p>
-                      <p className="text-xs text-gray-400">
-                        ID: {usuario._id?.toString().slice(-4) || 'N/A'}
+                      <p className="text-[11px] text-slate-400 font-mono">
+                        ID: {usuario._id?.toString().slice(-6) || 'N/A'}
                       </p>
                     </div>
                   </div>
                 ))}
                 
-                {/* Mostrar espacios vacíos para niveles incompletos */}
-                {Array.from({ length: Math.max(0, cantidadEsperada - data.length) }).map((_, index) => (
-                  <div 
-                    key={`empty-${nivel}-${index}`}
-                    className="p-2 bg-gray-800 bg-opacity-30 rounded flex items-center gap-2 border border-dashed border-gray-600"
-                  >
-                    <div className="w-6 h-6 rounded-full flex items-center justify-center bg-gray-700">
-                      <span className="text-xs text-gray-400">-</span>
+                {/* Mostrar espacios disponibles */}
+                {!busqueda && data.length < cantidadEsperada && (
+                  Array.from({ length: Math.min(6, cantidadEsperada - data.length) }).map((_, index) => (
+                    <div 
+                      key={`empty-${nivel}-${index}`}
+                      className="p-3.5 bg-slate-900/40 rounded-xl flex items-center gap-3 border border-dashed border-emerald-500/20 opacity-60"
+                    >
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-800 text-slate-500 text-xs">
+                        -
+                      </div>
+                      <div className="truncate text-slate-500">
+                        <p className="text-sm font-medium">Cupo Disponible</p>
+                        <p className="text-[11px]">Vacío para nuevo socio</p>
+                      </div>
                     </div>
-                    <div className="truncate text-gray-500">
-                      <p className="text-sm">Espacio disponible</p>
-                      <p className="text-xs">Vacío</p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             )}
           </div>
@@ -201,76 +209,140 @@ export const Red = () => {
     return Array.from({ length: 12 }, (_, i) => i + 1).map(nivel => renderAcordeon(nivel));
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4">Cargando tu red...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen flex flex-col text-white">
+    <div className="min-h-screen bg-[#06110D] text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-white">
       <Background />
-      <div className="max-w-6xl mx-auto px-4 py-12 flex-grow">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Mi Red</h1>
-          <div className="flex items-center gap-4 text-gray-300">
-            <div className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              <span>{username}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm bg-blue-500 px-2 py-1 rounded">Nivel: {nivelUsuario}</span>
-            </div>
-          </div>
-          <div className="mt-2">
-            <span className="text-sm text-yellow-500 font-medium">Nota:</span>{' '}
-            <span className="text-sm text-gray-400">
-              Haz clic en cada nivel para cargar y visualizar los usuarios correspondientes.
-            </span>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="bg-gradient-to-br from-blue-900 to-blue-700 p-4 rounded-lg">
-            <h3 className="text-blue-200 text-sm mb-2">Tu Progreso</h3>
-            <p className="text-2xl font-bold text-white">
-              {nivelesCompletados} <span className="text-sm font-normal text-blue-200">de 12 niveles completados</span>
-            </p>
-            <div className="w-full bg-blue-800 rounded-full h-3 mt-3">
-              <div 
-                className="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${(nivelesCompletados / 12) * 100}%` }}
-              ></div>
+      <main className="max-w-6xl mx-auto px-4 py-10 flex-grow w-full">
+        {/* Encabezado con Skeleton */}
+        {loading ? (
+          <div className="mb-8 animate-pulse space-y-4">
+            <div className="h-6 w-48 bg-emerald-500/20 rounded-full"></div>
+            <div className="h-9 w-64 bg-slate-700 rounded-xl"></div>
+            <div className="flex gap-3">
+              <div className="h-4 w-32 bg-slate-800 rounded"></div>
+              <div className="h-4 w-44 bg-emerald-500/20 rounded"></div>
             </div>
-            <p className="text-xs text-blue-300 mt-2">
-              {nivelesCompletados === 12 ? '¡Red completa!' : `Faltan ${12 - nivelesCompletados} niveles`}
-            </p>
           </div>
-          <div className="bg-gray-800 bg-opacity-50 p-4 rounded-lg">
-            <h3 className="text-gray-400 text-sm">Información de Red</h3>
-            <p className="text-2xl font-bold text-white">{nivelesCompletados} <span className="text-sm font-normal text-gray-300">niveles</span></p>
-            <p className="text-xs text-gray-400 mt-2">Estructura: 3 → 9 → 27 → 81 → ...</p>
-          </div>
-        </div>
+        ) : (
+          <div className="mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-semibold mb-2">
+                  <Sprout className="h-3.5 w-3.5" />
+                  <span>Ecosistema Granja Raíz de Vida</span>
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-extrabold text-white font-heading">
+                  Estructura de mi Red
+                </h1>
+                <div className="flex flex-wrap items-center gap-3 text-slate-300 mt-2">
+                  <div className="flex items-center gap-1.5 text-sm font-medium">
+                    <User className="h-4 w-4 text-emerald-400" />
+                    <span>{username}</span>
+                  </div>
+                  <span className="text-xs text-slate-500">•</span>
+                  <div className="flex items-center gap-1.5 text-sm">
+                    <Award className="h-4 w-4 text-amber-400" />
+                    <span className="text-xs font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 px-2.5 py-1 rounded-lg">
+                      Rango: Nivel {rangoActualNumero} - {rangoActualNombre}
+                    </span>
+                  </div>
+                </div>
+              </div>
 
-        <div className="space-y-3">
-          <h2 className="text-xl font-semibold mb-3">Estructura de la Red</h2>
-          <div className="mb-4 p-3 bg-gray-800 rounded-lg">
-            <p className="text-sm text-gray-300">
-              <span className="text-yellow-400">💡</span> Expande cada nivel para ver los usuarios. 
-              Los espacios vacíos están disponibles para nuevos miembros.
-            </p>
+              {/* Buscador de usuario en la red */}
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar socio en tu red..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-[#0A1812]/80 border border-emerald-500/20 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                />
+              </div>
+            </div>
           </div>
-          {renderTodosLosNiveles()}
-        </div>
-      </div>
+        )}
+
+        {/* 3 Tarjetas de Resumen con Skeletons */}
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={`skel-red-kpi-${i}`} className="glass-card p-5 rounded-2xl border border-emerald-500/10 bg-[#0A1812]/70 animate-pulse flex items-center gap-4">
+                <div className="h-12 w-12 rounded-xl bg-emerald-500/20 shrink-0"></div>
+                <div className="space-y-2 flex-1">
+                  <div className="h-3 w-24 bg-emerald-500/20 rounded"></div>
+                  <div className="h-6 w-32 bg-slate-700 rounded-lg"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                <Layers className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs uppercase font-semibold text-slate-400">Nivel Actual</p>
+                <p className="text-xl font-extrabold text-white font-heading">
+                  {rangoActualNombre}
+                </p>
+              </div>
+            </div>
+
+            <div className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center shrink-0">
+                <Users className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs uppercase font-semibold text-slate-400">Socios Totales</p>
+                <p className="text-xl font-extrabold text-white font-mono">
+                  {totalDescendientes} <span className="text-xs font-normal text-slate-400">en 12 niveles</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="glass-card p-5 rounded-2xl border border-emerald-500/20 bg-[#0A1812]/80 flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                <Award className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs uppercase font-semibold text-slate-400">Niveles Completos</p>
+                <p className="text-xl font-extrabold text-amber-300 font-heading">
+                  {nivelesCompletados} de 12
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Acordeones de los 12 Niveles con Skeletons */}
+        {loading ? (
+          <div className="space-y-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={`skel-acc-${i}`} className="p-4 rounded-2xl bg-[#0A1812]/70 border border-emerald-500/10 animate-pulse flex justify-between items-center">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20"></div>
+                  <div className="space-y-2">
+                    <div className="h-4 w-44 bg-emerald-500/20 rounded"></div>
+                    <div className="h-3 w-32 bg-slate-800 rounded"></div>
+                  </div>
+                </div>
+                <div className="w-28 h-2 bg-slate-800 rounded-full hidden sm:block"></div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {renderTodosLosNiveles()}
+          </div>
+        )}
+      </main>
+
       <br /><br />
-     <MobileNav />
+      <MobileNav />
     </div>
   );
 };
